@@ -4,6 +4,7 @@ import CourseCreator from '@/components/courseData/courseCreator';
 import CustomNotification from '@/components/CustomNotification';
 import authService from '@/services/authService';
 import axios from 'axios';
+import { API_COURSE_ENDPOINTS } from '@/config/courseapi';
 
 const CourseManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,50 +48,57 @@ const CourseManagement = () => {
   });
 
   useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const response = await axios.get('http://localhost:8000/Course/courses/list/admin/');
-        let data = response.data;
-        console.log('✅ Raw API response:', data);
-        
-        // ✅ FIXED: Handle backend response format { courses: [...], course_count: ... }
-        let coursesArray = [];
-        
-        if (Array.isArray(data)) {
-          // Direct array response
-          coursesArray = data;
-        } else if (data.courses && Array.isArray(data.courses)) {
-          // Backend returns { courses: [...], course_count: ..., user_authenticated: ..., is_staff: ... }
-          coursesArray = data.courses;
-          console.log(`✅ Found ${data.courses.length} courses from API`);
-        } else if (data.results && Array.isArray(data.results)) {
-          // Pagination format { results: [...] }
-          coursesArray = data.results;
-        } else if (typeof data === 'object' && data !== null && Object.keys(data).length > 0) {
-          // Single course object
-          coursesArray = [data];
-        } else {
-          coursesArray = [];
+  const fetchCourses = async () => {
+    setLoading(true);
+    const token = authService.getToken();
+
+    try {
+      const response = await axios.get(
+        API_COURSE_ENDPOINTS.COURSE_LIST,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         }
+      );
 
-        // ✅ FIXED: Map all courses to frontend format
-        const mappedCourses = coursesArray.map(mapCourseData);
-        
-        console.log('✅ Mapped courses:', mappedCourses);
-        console.log(`✅ Total courses to display: ${mappedCourses.length}`);
-        
-        setCourses(mappedCourses);
-      } catch (error) {
-        console.error('❌ Error fetching courses:', error);
-        console.error('❌ Error response:', error.response?.data);
-        setError(`Failed to load courses: ${error.message}`);
-      } finally {
-        setLoading(false);
+      const data = response.data;
+      console.log('✅ Raw API response:', data);
+
+      // Normalize response to an array
+      let coursesArray = [];
+
+      if (Array.isArray(data)) {
+        coursesArray = data;
+      } else if (data.courses && Array.isArray(data.courses)) {
+        coursesArray = data.courses;
+      } else if (data.results && Array.isArray(data.results)) {
+        coursesArray = data.results;
+      } else if (typeof data === 'object' && data !== null) {
+        coursesArray = [data];
       }
-    };
 
-    fetchCourses();
-  }, []);
+      // Map courses to frontend format
+      const mappedCourses = coursesArray.map(mapCourseData);
+
+      console.log('✅ Mapped courses:', mappedCourses);
+      console.log(`✅ Total courses to display: ${mappedCourses.length}`);
+
+      setCourses(mappedCourses);
+      setError(null);
+    } catch (error) {
+      console.error('❌ Error fetching courses:', error);
+      console.error('❌ Error response:', error.response?.data);
+      setError(`Failed to load courses: ${error.message}`);
+      setCourses([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchCourses();
+}, []);
 
   // Handle course creation or update
   const handleCourseCreatedOrUpdated = (course) => {

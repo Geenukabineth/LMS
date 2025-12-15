@@ -17,7 +17,6 @@ const UserManagementPanel = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
 
-  const BASE_URL = 'http://localhost:8000/lms/register';
 
   // Form state for adding/editing receptionists
   const [formData, setFormData] = useState({
@@ -34,7 +33,7 @@ const UserManagementPanel = () => {
   const fetchTeachers = async () => {
     setLoading(true);
     try {
-      const response = await fetchWithAuth(API_USER_ENDPOINTS.TEACHER_LIST);
+      const response = await axios.get(API_USER_ENDPOINTS.TEACHER_LIST);
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
@@ -60,7 +59,7 @@ const UserManagementPanel = () => {
   const fetchReceptionists = async () => {
     setLoading(true);
     try {
-      const response = await fetchWithAuth(API_USER_ENDPOINTS.RECEPTIONIST_LIST);
+      const response = await axios.get(API_USER_ENDPOINTS.RECEPTIONIST_LIST);
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }

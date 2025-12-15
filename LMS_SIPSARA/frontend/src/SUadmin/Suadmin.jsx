@@ -9,36 +9,17 @@ import TeamsLMSChat from '@/components/chat';
 import UserDataPanel from '@/components/data/userdata';
 import Topbar from '@/components/topbar';
 import SettingsPanel from '@/components/setting';
-import authService  from '@/services/authService'; // ✅ Import centralized auth service
-import { API_USER_ENDPOINTS } from '@/config/userapi'; // ✅ Import API base URL
-import { API_COURSE_ENDPOINTS } from '@/config/courseapi'; // ✅ Import API base URL
+import authService  from '@/services/authService'; 
+import { API_USER_ENDPOINTS } from '@/config/userapi'; 
+import { API_COURSE_ENDPOINTS } from '@/config/courseapi'; 
 
 
-export const API_BASE_URL = 'http://localhost:8000';
 
-const WelcomeCard = () => (
-  <div className="p-6 text-white rounded-lg bg-gradient-to-r from-blue-600 to-purple-600">
-    <h2 className="mb-2 text-2xl font-bold">Welcome back, Admin!</h2>
-    <p className="text-blue-100">Here's what's happening with your institution today.</p>
-  </div>
-);
+
 
 // Sample data for charts - Replace with real API data
-const websiteTrafficData = [
-  { month: 'Jan', students: 245, teachers: 45, staff: 12, total: 302 },
-  { month: 'Feb', students: 290, teachers: 48, staff: 12, total: 350 },
-  { month: 'Mar', students: 335, teachers: 52, staff: 13, total: 400 },
-  { month: 'Apr', students: 380, teachers: 55, staff: 14, total: 449 },
-  { month: 'May', students: 425, teachers: 58, staff: 14, total: 497 },
-  { month: 'Jun', students: 470, teachers: 62, staff: 15, total: 547 },
-  { month: 'Jul', students: 520, teachers: 65, staff: 15, total: 600 },
-  { month: 'Aug', students: 565, teachers: 68, staff: 16, total: 649 },
-  { month: 'Sep', students: 610, teachers: 70, staff: 16, total: 696 },
-  { month: 'Oct', students: 655, teachers: 73, staff: 17, total: 745 },
-  { month: 'Nov', students: 700, teachers: 75, staff: 17, total: 792 },
-  { month: 'Dec', students: 745, teachers: 78, staff: 18, total: 841 },
-];
 
+  
 // Monthly income data
 const monthlyIncomeData = [
   { month: 'Jan', income: 450000, expenses: 320000, profit: 130000 },
@@ -76,6 +57,8 @@ const enrollmentData = [
   { course: 'Sinhala', enrolled: 167, capacity: 200, percentage: 84 },
 ];
 
+
+
 // Course distribution by department
 const departmentData = [
   { name: 'Science', value: 35, color: '#2DD4BF' },
@@ -94,6 +77,8 @@ export default function AdminDashboard() {
   const [coursesCount, setCoursesCount] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
+  const [user, setUser] = useState(null);
+  const [websiteTrafficData, setWebsiteTrafficData] = useState([]);
 
  
 
@@ -113,6 +98,40 @@ export default function AdminDashboard() {
       throw error;
     }
   };
+
+  // ✅ FIXED: Handle getCurrentUser safely with fallback
+  useEffect(() => {
+    try {
+      // Check if getCurrentUser exists as a function
+      if (typeof authService.getCurrentUser === 'function') {
+        const currentUser = authService.getCurrentUser();
+        setUser(currentUser);
+      } else if (authService.getToken()) {
+        // Fallback: Parse user from JWT token
+        const token = authService.getToken();
+        try {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split('')
+              .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+              .join('')
+          );
+          const userData = JSON.parse(jsonPayload);
+          setUser(userData);
+        } catch (decodeError) {
+          console.warn('Could not decode user from token:', decodeError);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      setUser(null);
+    }
+  }, []);
 
   // ✅ Check authentication on mount
   useEffect(() => {
@@ -188,7 +207,7 @@ useEffect(() => {
           if (response.status === 401) {
             console.warn('Authentication expired, attempting refresh...');
             await authService.refreshToken();
-            const retryResponse = await fetchWithAuth(`${API_BASE_URL}/lms/course/list/`);
+            const retryResponse = await fetchWithAuth(API_COURSE_ENDPOINTS.COURSE_LIST);
             if (!retryResponse.ok) throw new Error('Failed after token refresh');
             const data = await retryResponse.json();
             processCoursesData(data);
@@ -225,7 +244,7 @@ useEffect(() => {
     };
 
     fetchCoursesCount();
-  }, [API_BASE_URL]);
+  }, []);
 
   // ✅ Fetch receptionist count with auth service
   useEffect(() => {
@@ -234,18 +253,17 @@ useEffect(() => {
         const response = await fetchWithAuth(API_USER_ENDPOINTS.RECEPTIONIST_LIST);
         
         if (!response.ok) {
-        throw new Error(`Failed to fetch teacher: ${response.status}`);
+        throw new Error(`Failed to fetch receptionists: ${response.status}`);
       }
 
       const data = await response.json();
 
-      console.log("Teacher API data:", data);
+      console.log("Receptionist API data:", data);
 
-      // ✅ This WILL work now
       setReceptionistsCount(data?.count ?? 0);
 
     } catch (error) {
-      console.error("Error fetching teacher count:", error);
+      console.error("Error fetching receptionist count:", error);
       setReceptionistsCount(0);
     }
   };
@@ -254,10 +272,14 @@ useEffect(() => {
 }, []);
 
   useEffect(() => {
-    if (teacherCount > 0 && studentsCount > 0 && coursesCount > 0 && receptionistsCount >= 0) {
-      setLoadingStats(false);
-    }
-  }, [teacherCount, studentsCount, coursesCount, receptionistsCount]);
+  // Only consider stats loaded when we have meaningful data
+  const allLoaded = teacherCount > 0 && studentsCount > 0 && receptionistsCount >= 0;
+  const coursesLoaded = coursesCount > 0; // ✅ Add separate check for courses
+  
+  if (allLoaded && coursesLoaded) {
+    setLoadingStats(false);
+  }
+}, [teacherCount, studentsCount, coursesCount, receptionistsCount]);
 
   const formatCurrency = (value) => {
     return `Rs.${(value / 1000).toFixed(1)}K`;
@@ -278,7 +300,11 @@ useEffect(() => {
           {activeTab === 'dashboard' && (
             <div className="p-8 space-y-8">
               {/* Welcome Card */}
-              <WelcomeCard />
+              <div className="p-6 text-white rounded-lg bg-gradient-to-r from-blue-600 to-purple-600">
+                <h2 className="mb-2 text-2xl font-bold">
+                  Welcome back{user ? `, ${user.username || user.name || 'User'}` : ""}!
+                </h2>
+              </div>          
 
               {/* Stats Cards */}
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -320,7 +346,7 @@ useEffect(() => {
                     <div>
                       <p className="text-sm font-medium text-gray-600">Total Courses</p>
                       <p className="mt-2 text-3xl font-bold text-gray-800">
-                        {loadingStats ? '...' : coursesCount}
+                        {coursesCount}
                       </p>
                     </div>
                     <div className="p-3 bg-purple-100 rounded-full">
@@ -336,7 +362,7 @@ useEffect(() => {
                     <div>
                       <p className="text-sm font-medium text-gray-600">Receptionists</p>
                       <p className="mt-2 text-3xl font-bold text-gray-800">
-                        { receptionistsCount}
+                        {receptionistsCount}
                       </p>
                     </div>
                     <div className="p-3 bg-yellow-100 rounded-full">

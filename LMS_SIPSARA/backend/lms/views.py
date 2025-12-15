@@ -589,19 +589,39 @@ class CourseListByLevelView(APIView):
 class ReceptionRegisterlistView(APIView):
     permission_classes = (AllowAny,)
     
-    def get(self, request, id=None):
-        """Get all receptionists or a specific receptionist by ID"""
-        if id:
-            try:
-                user = User.objects.get(id=id, user_type=User.RECEPTIONIST)
-                serializer = ReceptionistListSerializer(user)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            except User.DoesNotExist:
-                return Response(
-                    {"error": "Receptionist not found"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        else:
-            users = User.objects.filter(user_type=User.RECEPTIONIST)
-            serializer = ReceptionistListSerializer(users, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+    def get(self, request):
+        resptionists = User.objects.filter(user_type=User.RECEPTIONIST)
+        serializer = ReceptionistListSerializer(resptionists, many=True)
+        conunt = resptionists.count()
+        return Response({
+            "success": True,
+            "count": conunt,
+            "receptionists": serializer.data
+        }, status=status.HTTP_200_OK)
+    
+class WebsiteTrafficAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_types = ['STUDENT', 'TEACHER', 'RECEPTIONIST', 'STAFF']  # adjust as needed
+        data = []
+
+        for month in range(1, 13):
+            month_data = {'month': f"{month:02d}"}
+
+            # Count students, teachers, staff for this month (optional: filter by created_at)
+            month_data['students'] = User.objects.filter(user_type='STUDENT', date_joined__month=month).count()
+            month_data['teachers'] = User.objects.filter(user_type='TEACHER', date_joined__month=month).count()
+            month_data['staff'] = User.objects.filter(user_type='RECEPTIONIST', date_joined__month=month).count()  # or STAFF
+            month_data['total'] = month_data['students'] + month_data['teachers'] + month_data['staff']
+
+            data.append(month_data)
+
+        # Map month numbers to names
+        month_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        for i, d in enumerate(data):
+            d['month'] = month_names[i]
+
+        return Response(data)
+
+        

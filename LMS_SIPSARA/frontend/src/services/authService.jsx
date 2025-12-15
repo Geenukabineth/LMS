@@ -189,6 +189,11 @@ class AuthService {
     const res = await this.api.get("/lms/profile");
     return res.data;
   }
+
+  getCurrentUser() {
+    const user = localStorage.getItem(this.userKey);
+    return user ? JSON.parse(user) : null;
+  }
 }
 
 export default new AuthService();
