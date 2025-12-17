@@ -15,9 +15,9 @@ import {
 import Chatbot from '@/components/aibot';
 import Topbar from '@/components/topbar';
 import StudentData from '@/components/data/studenData';
-import ModuleCreator from '../components/courseData/module';
-import AssignmentQuizPanel from '../components/courseData/quiz';
-import TeacherFeedbackPanel from '../components/courseData/feedback';
+import ModuleCreator from '../courseData/module';
+import AssignmentQuizPanel from '../courseData/quiz';
+import TeacherFeedbackPanel from '../courseData/feedback';
 import SettingsPanel from '@/components/setting';
 import TeamsLMSChat from '@/components/chat';
 import authService from '@/services/authService';
