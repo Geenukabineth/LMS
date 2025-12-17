@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, LogOut, Settings } from 'lucide-react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+// import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
 
 const SidebarHeader = ({
   activeTab,

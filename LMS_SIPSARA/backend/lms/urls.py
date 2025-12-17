@@ -46,6 +46,8 @@ urlpatterns = [
     # Teacher endpoints
     path("register/teacher/", TeacherRegisterView.as_view(), name="teacher_register"),
     path("register/teacher/<int:id>/", TeacherRegisterView.as_view(), name="teacher_detail"),
+    path("teacher/delete/<int:id>/", TeacherRegisterView.as_view(), name="teacher_delete"),
+    
     
     
     # Receptionist endpoints

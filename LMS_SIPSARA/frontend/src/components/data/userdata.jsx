@@ -2,7 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Search, Edit3, Trash, CheckCircle, XCircle, Users, UserCheck, X, Plus, Mail, Phone } from 'lucide-react';
 import AddTeacher from '@/SUadmin/teacheradd';
 import ReceptionistForm from '@/receptionist/addreception';
-import { API_USER_ENDPOINTS } from '@/config/userapi';
+import { API_USER_ENDPOINTS, API_BASE_URL } from '@/config/userapi';
+import axios from 'axios'; // ⬅️ FIX: Import axios
+
+// Note: Assuming API_BASE_URL is 'http://localhost:8000/lms/' from our prior context.
+// If it is just 'http://localhost:8000/', you need to adjust endpoint URLs below.
 
 const UserManagementPanel = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,7 +29,7 @@ const UserManagementPanel = () => {
     Email_Address: '',
     Phone_Number: '',
     Department: '',
-    
+
     is_active: true
   });
 
@@ -34,21 +38,22 @@ const UserManagementPanel = () => {
     setLoading(true);
     try {
       const response = await axios.get(API_USER_ENDPOINTS.TEACHER_LIST);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const data = await response.json();
+      const data = response.data;
 
-      if (Array.isArray(data)) {
+      // ⬅️ FIX 1: Access the 'teachers' array inside the response object
+      if (data && Array.isArray(data.teachers)) {
+        setUsers(data.teachers);
+      } else if (Array.isArray(data)) {
+        // Fallback for direct array response
         setUsers(data);
       } else {
-        console.error("API did not return an array:", data);
+        console.error("API did not return a valid teachers array:", data);
         setUsers([]);
-        setError("Invalid data received from API. Expected an array.");
+        setError("Invalid data received from API. Expected an array or object with a 'teachers' array.");
       }
       setError(null);
     } catch (error) {
-      setError(error.message);
+      setError(error.message || "Failed to fetch teachers.");
       setUsers([]);
     } finally {
       setLoading(false);
@@ -60,21 +65,22 @@ const UserManagementPanel = () => {
     setLoading(true);
     try {
       const response = await axios.get(API_USER_ENDPOINTS.RECEPTIONIST_LIST);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const data = await response.json();
+      const data = response.data;
 
-      if (Array.isArray(data)) {
+      // ⬅️ FIX 2: Access the 'receptionists' array inside the response object (assuming consistent API)
+      if (data && Array.isArray(data.receptionists)) {
+        setReceptionists(data.receptionists);
+      } else if (Array.isArray(data)) {
+        // Fallback for direct array response
         setReceptionists(data);
       } else {
-        console.error("API did not return an array:", data);
+        console.error("API did not return a valid receptionists array:", data);
         setReceptionists([]);
-        setError("Invalid data received from API. Expected an array.");
+        setError("Invalid data received from API. Expected an array or object with a 'receptionists' array.");
       }
       setError(null);
     } catch (error) {
-      setError(error.message);
+      setError(error.message || "Failed to fetch receptionists.");
       setReceptionists([]);
     } finally {
       setLoading(false);
@@ -103,21 +109,20 @@ const UserManagementPanel = () => {
     e.preventDefault();
     try {
       const method = editingUser ? 'PUT' : 'POST';
-      const url = editingUser 
-        ? `${BASE_URL}/receptionist/update/${editingUser}/`
-        : `${BASE_URL}/receptionist/add/`;
+      // ⬅️ FIX 3: Use API_BASE_URL (or adjust if your URL logic is different)
+      const url = editingUser
+        ? `${API_BASE_URL}receptionist/update/${editingUser}/`
+        : `${API_BASE_URL}receptionist/add/`;
 
-      const response = await fetch(url, {
+      // ⬅️ FIX 4: Use axios for submission
+      await axios({
         method: method,
+        url: url,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData)
+        data: formData
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to ${editingUser ? 'update' : 'add'} receptionist`);
-      }
 
       fetchReceptionists();
       setFormData({
@@ -126,14 +131,14 @@ const UserManagementPanel = () => {
         Email_Address: '',
         Phone_Number: '',
         Department: '',
-        
+
         is_active: true
       });
       setShowAddModal(false);
       setEditingUser(null);
     } catch (error) {
       console.error("Error submitting form:", error);
-      setError(error.message);
+      setError(error.message || "Failed to submit receptionist form.");
     }
   };
 
@@ -141,27 +146,25 @@ const UserManagementPanel = () => {
   const handleDelete = async (userId) => {
     try {
       const endpoint = activeTab === 'teachers' ? 'teacher' : 'receptionist';
-      const response = await fetch(`${BASE_URL}/${endpoint}/delete/${userId}/`, {
-        method: 'DELETE',
+      // ⬅️ FIX 5: Use API_BASE_URL and axios.delete
+      const url = `${API_BASE_URL}${endpoint}/delete/${userId}/`;
+
+      await axios.delete(url, {
         headers: {
           'Content-Type': 'application/json',
         },
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete user');
-      }
 
       if (activeTab === 'teachers') {
         fetchTeachers();
       } else {
         fetchReceptionists();
       }
-      
+
       setShowDeleteModal(false);
     } catch (error) {
       console.error("Error deleting user:", error);
-      setError(error.message);
+      setError(error.message || "Failed to delete user.");
     }
   };
 
@@ -178,7 +181,7 @@ const UserManagementPanel = () => {
         Email_Address: user.Email_Address || '',
         Phone_Number: user.Phone_Number || '',
         Department: user.Department || '',
-        
+
         is_active: user.is_active !== undefined ? user.is_active : true
       });
       setEditingUser(user.id);
@@ -189,7 +192,7 @@ const UserManagementPanel = () => {
 
   // Get current data based on active tab
   const currentData = activeTab === 'teachers' ? users : receptionists;
-  
+
   // Filter users based on search term
   const filteredUsers = currentData.filter((user) =>
     user && user.First_Name && user.First_Name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -213,7 +216,7 @@ const UserManagementPanel = () => {
                 Email_Address: '',
                 Phone_Number: '',
                 Department: '',
-                
+
                 is_active: true
               });
             }}
@@ -296,7 +299,7 @@ const UserManagementPanel = () => {
             />
           </div>
 
-          
+
 
           <div className="flex items-center">
             <input
@@ -324,7 +327,7 @@ const UserManagementPanel = () => {
                   Email_Address: '',
                   Phone_Number: '',
                   Department: '',
-                  
+
                   is_active: true
                 });
               }}
@@ -576,7 +579,9 @@ const UserManagementPanel = () => {
           editingTeacher={editingUser}
         />
       )}
-      {showAddModal && modalType === 'receptionist' && <ReceptionistForm />}
+      {/* ⬅️ FIX 6: Use the component defined in this file to handle receptionist forms */}
+      {showAddModal && modalType === 'receptionist' && <AddReceptionistModal />}
+
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (

@@ -9,7 +9,7 @@ from .serializers import (
     ReceptionRegisterSerializer,
     TeacherRegisterSerializer,
     TeacherListSerializer,
-    ReceptionistSerializer,
+    TeacherUpdateSerializer,
     ReceptionistListSerializer,
     ProfileUpdateSerializer,
     PasswordChangeSerializer,
@@ -288,35 +288,50 @@ class StudentSelfRegistrationAPIView(generics.CreateAPIView):
 
 class TeacherRegisterView(APIView):
     permission_classes = (AllowAny,)
-    
+
     def post(self, request):
         serializer = TeacherRegisterSerializer(data=request.data)
         if serializer.is_valid():
             result = serializer.save()
             user = result.get("user") if isinstance(result, dict) else result
-            
+
             if isinstance(result, dict) and result.get("temporary_password"):
                 send_mail(
                     subject="Your Teacher Account Has Been Created",
                     message=(
                         f"Your teacher account has been created with the email {user.email}. "
-                        f"Please log in with this temporary password: "
-                        f"{result.get('temporary_password')} "
-                        f"and change it immediately."
+                        f"Temporary password: {result.get('temporary_password')} "
+                        f"Please change it after login."
                     ),
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
-                    fail_silently=True,
+                    fail_silently=False,
                 )
+
             return Response(
-                {"message": "Teacher registered successfully", "user_id": user.id},
-                status=status.HTTP_201_CREATED,
+                {"success": True, "user_id": user.id},
+                status=status.HTTP_201_CREATED
             )
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def get(self, request, id=None):
-        """Get teacher(s) - list or specific by ID"""
-        teachers = Teacher.objects.all()
+        """Get teacher list or single teacher"""
+        if id:
+            try:
+                teacher = Teacher.objects.select_related("user").get(user__id=id)
+                serializer = TeacherListSerializer(teacher.user)
+                return Response(
+                    {"success": True, "teacher": serializer.data},
+                    status=status.HTTP_200_OK
+                )
+            except Teacher.DoesNotExist:
+                return Response(
+                    {"error": "Teacher not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        teachers = Teacher.objects.select_related("user").all()
         serializer = TeacherListSerializer(
             [teacher.user for teacher in teachers],
             many=True
@@ -334,30 +349,46 @@ class TeacherRegisterView(APIView):
     def put(self, request, id=None):
         """Update teacher"""
         if not id:
-            return Response({"error": "Teacher ID is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": "Teacher ID is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             teacher = Teacher.objects.get(user__id=id)
         except Teacher.DoesNotExist:
-            return Response({"error": "Teacher not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-        serializer = TeacherRegisterSerializer(teacher.user, data=request.data, partial=True)
+            return Response(
+                {"error": "Teacher not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = TeacherUpdateSerializer(
+            teacher.user, data=request.data, partial=True
+        )
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, id=None):
         """Delete teacher"""
         if not id:
-            return Response({"error": "Teacher ID is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": "Teacher ID is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             teacher = Teacher.objects.get(user__id=id)
             teacher.user.delete()
-            return Response({"message": "Teacher deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Teacher.DoesNotExist:
-            return Response({"error": "Teacher not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Teacher not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class ProfileUpdateView(APIView):

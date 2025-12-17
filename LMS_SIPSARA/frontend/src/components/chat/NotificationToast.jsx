@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+// import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
 
 const NotificationToast = ({ notifications = [], onDismiss, loadUnreadCount }) => {
   const [displayNotifs, setDisplayNotifs] = useState([]);

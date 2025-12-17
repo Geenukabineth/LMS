@@ -222,44 +222,54 @@ class ReceptionRegisterSerializer(serializers.ModelSerializer):
 # --- Teacher Serializers ---
 
 class TeacherRegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=False, validators=[validate_password])
+    password = serializers.CharField(
+        write_only=True, required=False, validators=[validate_password]
+    )
     password2 = serializers.CharField(write_only=True, required=False)
-    firstName = serializers.CharField(max_length=100, required=True)
-    lastName = serializers.CharField(max_length=100, required=True)
-    department = serializers.CharField(max_length=100, required=True)
-    gender = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    firstName = serializers.CharField(required=True)
+    lastName = serializers.CharField(required=True)
+    department = serializers.CharField(required=True)
+    gender = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
-        db_table = "lms_user"
-        fields = ['email', 'username', 'password', 'password2', 'phone', 'firstName', 'lastName', 'department', 'gender']
+        fields = [
+            "email", "username", "password", "password2",
+            "phone", "firstName", "lastName", "department", "gender"
+        ]
 
     def validate(self, data):
-        if data.get("password") and data.get("password2") and data["password"] != data["password2"]:
-            raise serializers.ValidationError({"password2": "Passwords do not match"})
+        if data.get("password") and data.get("password2"):
+            if data["password"] != data["password2"]:
+                raise serializers.ValidationError(
+                    {"password2": "Passwords do not match"}
+                )
         data.pop("password2", None)
         return data
 
     def create(self, validated_data):
         username = validated_data.get("username")
+
         if not username:
-            email_prefix = validated_data["email"].split('@')[0]
-            base_username = email_prefix
+            base_username = validated_data["email"].split("@")[0]
+            username = base_username
             counter = 1
+
             while User.objects.filter(username=username).exists():
                 username = f"{base_username}{counter}"
                 counter += 1
-            validated_data['username'] = username
 
         password = validated_data.get("password")
         is_temporary_password = False
+
         if not password:
             password = generate_dummy_password()
             is_temporary_password = True
 
         user = User.objects.create_user(
             email=validated_data["email"],
-            username=validated_data["username"],
+            username=username,
             user_type=User.INSTRUCTOR,
             password=password,
             phone=validated_data.get("phone", ""),
@@ -276,15 +286,35 @@ class TeacherRegisterSerializer(serializers.ModelSerializer):
             gender=validated_data.get("gender", "")
         )
 
-        Profile.objects.create(
+        Profile.objects.get_or_create(
             user=user,
-            full_name=f"{validated_data['firstName']} {validated_data['lastName']}"
+            defaults={
+                "full_name": f"{validated_data['firstName']} {validated_data['lastName']}"
+            }
         )
+
 
         return {
             "user": user,
             "temporary_password": password if is_temporary_password else None
         }
+class TeacherUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["email", "phone", "firstName", "lastName"]
+
+    def update(self, instance, validated_data):
+        instance.email = validated_data.get("email", instance.email)
+        instance.phone = validated_data.get("phone", instance.phone)
+        instance.save()
+
+        teacher = instance.teacher
+        teacher.First_Name = validated_data.get("firstName", teacher.First_Name)
+        teacher.Last_Name = validated_data.get("lastName", teacher.Last_Name)
+        teacher.save()
+
+        return instance
+
 
 class TeacherListSerializer(serializers.ModelSerializer):
     First_Name = serializers.CharField(source='teacher.First_Name')
