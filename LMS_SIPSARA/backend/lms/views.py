@@ -16,6 +16,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     CurrentUserSerializer,
+    ReceptionistSerializer,
 )
 from .models import User, Student, Teacher, Receptionist, Profile
 from django.contrib.auth import authenticate
@@ -62,83 +63,32 @@ class ReceptionRegisterView(APIView):
         
     
     # views.py snippet
-def post(self, request):
-    serializer = ReceptionRegisterSerializer(data=request.data)
-    if serializer.is_valid():
-        result = serializer.save()
-        user = result.get("user") if isinstance(result, dict) else result
-        
-        if isinstance(result, dict) and result.get("temporary_password"):
-            send_mail( # <-- Django's built-in email function
-                subject="Your Account Has Been Created",
-                message=(
-                    f"Your account has been created with the email {user.email}. "
-                    f"Please log in with this temporary password: "
-                    f"{result.get('temporary_password')} "
-                    f"and change it immediately."
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL, # <-- Uses Django settings
-                recipient_list=[user.email],
-                fail_silently=True,
-            )
-            return Response(
-                {"message": "Reception registered successfully", "user_id": user.id},
-                status=status.HTTP_201_CREATED,
-            )
+    def post(self, request):
+        serializer = ReceptionRegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            result = serializer.save()
+            user = result.get("user") if isinstance(result, dict) else result
+            
+            if isinstance(result, dict) and result.get("temporary_password"):
+                send_mail( # <-- Django's built-in email function
+                    subject="Your Account Has Been Created",
+                    message=(
+                        f"Your account has been created with the email {user.email}. "
+                        f"Please log in with this temporary password: "
+                        f"{result.get('temporary_password')} "
+                        f"and change it immediately."
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL, # <-- Uses Django settings
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+                return Response(
+                    {"message": "Reception registered successfully", "user_id": user.id},
+                    status=status.HTTP_201_CREATED,
+                )
         # ... rest of the code
     
-    def put(self, request, id):
-        """Update a receptionist"""
-        try:
-            user = User.objects.get(id=id, user_type=User.RECEPTIONIST)
-            receptionist = user.receptionist
-        except User.DoesNotExist:
-            return Response(
-                {"error": "Receptionist not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Receptionist.DoesNotExist:
-            return Response(
-                {"error": "Receptionist profile not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Update receptionist fields
-        receptionist.First_Name = request.data.get('firstName', receptionist.First_Name)
-        receptionist.Last_Name = request.data.get('lastName', receptionist.Last_Name)
-        receptionist.Email_Address = request.data.get('email', receptionist.Email_Address)
-        receptionist.Phone_Number = request.data.get('phone', receptionist.Phone_Number)
-        receptionist.gender = request.data.get('gender', receptionist.gender)
-        receptionist.save()
-
-        # Update user fields
-        user.email = request.data.get('email', user.email)
-        user.phone = request.data.get('phone', user.phone)
-        user.is_active = request.data.get('is_active', user.is_active)
-        user.save()
-
-        serializer = ReceptionistListSerializer(user)
-        return Response(
-            {"message": "Receptionist updated successfully", "data": serializer.data},
-            status=status.HTTP_200_OK
-        )
     
-    def delete(self, request, id):
-        """Delete a receptionist (soft delete by setting is_active to False)"""
-        try:
-            user = User.objects.get(id=id, user_type=User.RECEPTIONIST)
-            user.is_active = False
-            user.save()
-            return Response(
-                {"message": "Receptionist deleted successfully"},
-                status=status.HTTP_200_OK
-            )
-        except User.DoesNotExist:
-            return Response(
-                {"error": "Receptionist not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
 class UserListView(APIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -347,7 +297,7 @@ class TeacherRegisterView(APIView):
         )
 
     def put(self, request, id=None):
-        """Update teacher"""
+        """Update teacher and associated user profile"""
         if not id:
             return Response(
                 {"error": "Teacher ID is required"},
@@ -355,23 +305,33 @@ class TeacherRegisterView(APIView):
             )
 
         try:
-            teacher = Teacher.objects.get(user__id=id)
-        except Teacher.DoesNotExist:
+            # We fetch the User object because TeacherUpdateSerializer 
+            # is based on the User model
+            user = User.objects.get(id=id, user_type=User.INSTRUCTOR)
+        except User.DoesNotExist:
             return Response(
                 {"error": "Teacher not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        # Use TeacherUpdateSerializer which handles the logic for 
+        # updating both User and Teacher models
         serializer = TeacherUpdateSerializer(
-            teacher.user, data=request.data, partial=True
+            user, 
+            data=request.data, 
+            partial=True
         )
 
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            serializer.save()  # Triggers the update() method in TeacherUpdateSerializer
+            return Response({
+                "success": True,
+                "message": "Teacher updated successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
     def delete(self, request, id=None):
         """Delete teacher"""
         if not id:
@@ -619,6 +579,18 @@ class CourseListByLevelView(APIView):
 
 class ReceptionRegisterlistView(APIView):
     permission_classes = (AllowAny,)
+
+    def post(self, request):
+        serializer = ReceptionistSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Receptionist registered successfully",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        # ALWAYS return a response for the failure case
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def get(self, request):
         resptionists = User.objects.filter(user_type=User.RECEPTIONIST)
@@ -629,6 +601,59 @@ class ReceptionRegisterlistView(APIView):
             "count": conunt,
             "receptionists": serializer.data
         }, status=status.HTTP_200_OK)
+    
+    def put(self, request, id):
+        """Update a receptionist profile and linked user account"""
+        try:
+            # 1. Find the User first (this is the base for the OneToOne relationship)
+            user = User.objects.get(id=id, user_type=User.RECEPTIONIST)
+            
+            # 2. Access the linked receptionist profile in lms_receptionist
+            # This uses the OneToOne related name 'receptionist'
+            receptionist = user.receptionist
+        except (User.DoesNotExist, Receptionist.DoesNotExist):
+            return Response(
+                {"error": "Receptionist or profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 3. Update fields in the lms_receptionist table
+        # We use request.data.get() to check for the keys sent by your React form
+        receptionist.First_Name = request.data.get('First_Name', receptionist.First_Name)
+        receptionist.Last_Name = request.data.get('Last_Name', receptionist.Last_Name)
+        receptionist.Email_Address = request.data.get('Email_Address', receptionist.Email_Address)
+        receptionist.Phone_Number = request.data.get('Phone_Number', receptionist.Phone_Number)
+        receptionist.gender = request.data.get('gender', receptionist.gender)
+        receptionist.save()
+
+        # 4. Update the linked User account fields in lms_user
+        user.email = request.data.get('Email_Address', user.email)
+        user.phone = request.data.get('Phone_Number', user.phone)
+        user.is_active = request.data.get('is_active', user.is_active)
+        user.save()
+
+        # 5. Return the updated data using the List Serializer
+        serializer = ReceptionistListSerializer(user)
+        return Response(
+            {"message": "Receptionist updated successfully", "data": serializer.data},
+            status=status.HTTP_200_OK
+        )
+        
+    def delete(self, request, id):
+        """Delete a receptionist (soft delete by setting is_active to False)"""
+        try:
+            user = User.objects.get(id=id, user_type=User.RECEPTIONIST)
+            user.delete()             
+            return Response(
+                {"message": "Receptionist deleted successfully"},
+                status=status.HTTP_200_OK
+            )
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Receptionist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
     
 class WebsiteTrafficAPIView(APIView):
     permission_classes = [IsAuthenticated]

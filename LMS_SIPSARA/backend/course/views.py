@@ -1484,86 +1484,82 @@ class EnrolledCourseListAPIView(ListAPIView):
 # ADMIN COURSE LIST AND COUNT
 # ============================================================================
 
- 
-
-class AdminCourseListCountAPIView(ListAPIView):
-
-    """
-
-    Get course count and list for admin.
-
-    ✅ FIXED: Now supports filtering by teacher_id for admins
-
-    """
-
+class AdminCourseListAPIView(ListAPIView):
     serializer_class = CourseSerializer
-
     permission_classes = [permissions.IsAuthenticated]
 
- 
-
     def get_queryset(self):
-
-        # Check if user is admin/staff
-
+        
         if self.request.user.is_staff:
-
-            # Admin can filter by teacher_id parameter
-
             teacher_id = self.request.query_params.get('teacher_id')
-
-           
             if teacher_id:
-
                 try:
-
+                    # Filter courses for a specific teacher
                     teacher = Teacher.objects.get(user_id=teacher_id)
-
                     return Course.objects.filter(teacher=teacher).order_by('-date')
-
                 except Teacher.DoesNotExist:
-
                     return Course.objects.none()
-
-           
-            # If no teacher_id specified, return all courses
-
             return Course.objects.all().order_by('-date')
-
-       
-        # Regular users get only published courses
-
+        
         return Course.objects.filter(platform_status='published').order_by('-date')
 
- 
-
+    # --- GET: List and Count ---
     def list(self, request, *args, **kwargs):
-
         queryset = self.get_queryset()
-
         serializer = self.get_serializer(queryset, many=True)
-
-       
+        
         return Response({
-
             'course_count': queryset.count(),
-
             'courses': serializer.data,
-
             'user_authenticated': request.user.is_authenticated,
-
             'is_staff': request.user.is_staff if request.user.is_authenticated else False
-
         })
 
- 
+    # --- POST: Create Course (Admin Only) ---
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = AdminCourseCreateSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # --- PUT: Update Course (Admin Only) ---
+    def put(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Expecting 'course_id' in query params or request data
+        course_id = request.data.get('id') or request.query_params.get('id')
+        if not course_id:
+            return Response({"detail": "ID is required for update."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        course = get_object_or_404(Course, id=course_id)
+        serializer = CourseSerializer(course, data=request.data, partial=True, context={'request': request})
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # --- DELETE: Remove Course (Admin Only) ---
+    def delete(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+            
+        course_id = request.data.get('id') or request.query_params.get('id')
+        if not course_id:
+            return Response({"detail": "ID is required for deletion."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        course = get_object_or_404(Course, id=course_id)
+        course.delete()
+        return Response({"detail": "Course deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer_context(self):
-
         context = super().get_serializer_context()
-
         context['request'] = self.request
-
         return context
 
  

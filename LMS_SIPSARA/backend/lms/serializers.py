@@ -299,22 +299,31 @@ class TeacherRegisterSerializer(serializers.ModelSerializer):
             "temporary_password": password if is_temporary_password else None
         }
 class TeacherUpdateSerializer(serializers.ModelSerializer):
+    # Explicitly define fields from the related Teacher model
+    firstName = serializers.CharField(source='teacher.First_Name', required=False)
+    lastName = serializers.CharField(source='teacher.Last_Name', required=False)
+
     class Meta:
         model = User
+        # These names are now valid because they are defined above
         fields = ["email", "phone", "firstName", "lastName"]
 
     def update(self, instance, validated_data):
+        # 1. Update User model fields
         instance.email = validated_data.get("email", instance.email)
         instance.phone = validated_data.get("phone", instance.phone)
         instance.save()
 
-        teacher = instance.teacher
-        teacher.First_Name = validated_data.get("firstName", teacher.First_Name)
-        teacher.Last_Name = validated_data.get("lastName", teacher.Last_Name)
-        teacher.save()
+        # 2. Update the related Teacher model fields
+        # 'teacher' data is nested due to the 'source' attribute used above
+        teacher_data = validated_data.get('teacher')
+        if teacher_data:
+            teacher = instance.teacher
+            teacher.First_Name = teacher_data.get("First_Name", teacher.First_Name)
+            teacher.Last_Name = teacher_data.get("Last_Name", teacher.Last_Name)
+            teacher.save()
 
         return instance
-
 
 class TeacherListSerializer(serializers.ModelSerializer):
     First_Name = serializers.CharField(source='teacher.First_Name')
@@ -340,67 +349,60 @@ class TeacherListSerializer(serializers.ModelSerializer):
 # --- Receptionist Serializers ---
 
 class ReceptionistSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(write_only=True)
     password = serializers.CharField(write_only=True, required=False, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=False)
-    firstName = serializers.CharField(max_length=100, required=True)
-    lastName = serializers.CharField(max_length=100, required=True)
-    gender = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    # Use source to point to the related Receptionist model for data representation
+    firstName = serializers.CharField(source='receptionist.First_Name')
+    lastName = serializers.CharField(source='receptionist.Last_Name')
+    gender = serializers.CharField(source='receptionist.gender', required=False, allow_blank=True)
+    Phone_Number = serializers.CharField(source='receptionist.Phone_Number', required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ["email", "username", "password", "password2", "phone", "firstName", "lastName", "gender"]
-
-    def validate(self, data):
-        if data.get("password") and data.get("password2") and data["password"] != data["password2"]:
-            raise serializers.ValidationError({"password2": "Passwords do not match"})
-        data.pop("password2", None)
-        return data
+        fields = [
+            "id", "email", "username", "password", "password2",
+            "Phone_Number", "firstName", "lastName", "gender",
+        ]
 
     def create(self, validated_data):
+        # Extract data from the source mapping
+        receptionist_data = validated_data.pop('receptionist') # This contains First_Name, Last_Name, etc.
+        email = validated_data.pop("email")
+        password = validated_data.pop("password", None)
+        
+        # Handle Username generation
         username = validated_data.get("username")
         if not username:
-            email_prefix = validated_data["email"].split('@')[0]
-            base_username = email_prefix
+            base = email.split("@")[0]
+            username = base
             counter = 1
             while User.objects.filter(username=username).exists():
-                username = f"{base_username}{counter}"
+                username = f"{base}{counter}"
                 counter += 1
-            validated_data["username"] = username
 
-        password = validated_data.get("password")
-        is_temporary_password = False
-        if not password:
-            password = generate_dummy_password()
-            is_temporary_password = True
-
+        # Create the User instance (lms_user table)
         user = User.objects.create_user(
-            email=validated_data["email"],
-            username=validated_data["username"],
-            user_type="receptionist",
-            password=password,
-            phone=validated_data.get("phone", ""),
-            is_temporary_password=is_temporary_password
+            username=username,
+            email=email,
+            password=password or generate_dummy_password(),
+            user_type=User.RECEPTIONIST,
+            phone=receptionist_data.get('Phone_Number', ""), # Map to user.phone
+            is_temporary_password=True if not password else False
         )
 
+        # Create the Receptionist instance (lms_receptionist table)
         Receptionist.objects.create(
             user=user,
-            First_Name=validated_data["firstName"],
-            Last_Name=validated_data["lastName"],
-            Email_Address=validated_data["email"],
-            Phone_Number=validated_data.get("phone", ""),
-            gender=validated_data.get("gender", "")
+            First_Name=receptionist_data.get('First_Name'),
+            Last_Name=receptionist_data.get('Last_Name'),
+            Email_Address=email,
+            Phone_Number=receptionist_data.get('Phone_Number', ""),
+            gender=receptionist_data.get('gender', ""),
         )
 
-        Profile.objects.create(
-            user=user,
-            full_name=f"{validated_data['firstName']} {validated_data['lastName']}"
-        )
-
-        return {
-            "user": user,
-            "temporary_password": password if is_temporary_password else None
-        }
-
+        return user
 class ReceptionistListSerializer(serializers.ModelSerializer):
     First_Name = serializers.CharField(source="receptionist.First_Name")
     Last_Name = serializers.CharField(source="receptionist.Last_Name")

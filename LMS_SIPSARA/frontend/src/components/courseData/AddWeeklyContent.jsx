@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, Video, FileText, Save, Trash2, GripVertical, Upload, Link as LinkIcon, ArrowLeft } from 'lucide-react';
 import { API_COURSE_ENDPOINTS } from '@/config/courseapi';
-import authService from '@/services/authService';
+import authService from '@/context/authService';
 
 
 const AddWeeklyContent = ({ courseId, onBack }) => {

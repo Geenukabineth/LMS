@@ -8,7 +8,7 @@ from .views import (
     CourseUpdateAPIView,
     CourseDestroyAPIView,
     EnrollCourseAPIView,
-    AdminCourseListCountAPIView,
+    AdminCourseListAPIView,
     FileUploadAPIView,
     AdminCourseCreateAPIView,
     TeacherCourseAssignmentAPIView,
@@ -107,9 +107,11 @@ urlpatterns = [
     # ✅ EXISTING: Admin course list
     # ============================================================================
 
-    path('courses/list/', AdminCourseListCountAPIView.as_view(), name='course-list-short'),
 
-    path('courses/list/admin/', AdminCourseListCountAPIView.as_view(), name='course-list'),
+    path('courses/list/admin/', AdminCourseListAPIView.as_view(), name='course-list'),
+    path('courses/list/admin/<int:course_id>/', AdminCourseListAPIView.as_view(), name='course-list-paginated'),
+    
+    
 
    
 
@@ -127,7 +129,7 @@ urlpatterns = [
 
     # Course count
 
-    path('courses/list/count/admin/', AdminCourseListCountAPIView.as_view(), name='course-count'),
+    path('courses/list/count/admin/', AdminCourseListAPIView.as_view(), name='course-count'),
 
    
 

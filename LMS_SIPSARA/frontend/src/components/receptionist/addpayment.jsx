@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, DollarSign, Loader, AlertCircle, CheckCircle } from 'lucide-react';
-import authService from '@/services/authService';
+import authService from '@/context/authService';
 
 /**
  * ✅ Fixed Addpayment Component

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, AlertCircle, Loader, Trash2, Clock, CheckCircle, XCircle, Edit2, TrendingUp, RefreshCw } from 'lucide-react';
-import authService from '@/services/authService';
+import authService from '@/context/authService';
 
 const EnrollmentAccess = ({ 
   selectedStudent,

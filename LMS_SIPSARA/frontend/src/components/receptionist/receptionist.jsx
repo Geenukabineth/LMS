@@ -3,14 +3,14 @@ import {
   User, DollarSign, Search, Plus, Edit3, Check, X, Calendar, Phone, Mail, 
   Settings, BookOpen, AlertCircle, Loader, TrendingDown, ChevronRight, BookMarked
 } from 'lucide-react';
-import Useradd from '@/receptionist/useradd';
-import Addpayment from '@/receptionist/addpayment';
-import CourseAccess from '@/receptionist/course_access';
-import EnrollmentAccess from '@/receptionist/enrollment_access';
-import Topbar from '../components/topbar';
-import SettingsComponent from '../components/setting';
-import PaymentPage from '../receptionist/Receptionistpayment';
-import authService from '@/services/authService';
+import Useradd from '@/components/receptionist/useradd';
+import Addpayment from '@/components/receptionist/addpayment';
+import CourseAccess from '@/components/receptionist/course_access';
+import EnrollmentAccess from '@/components/receptionist/enrollment_access';
+import Topbar from '@/components/topbar';
+import SettingsComponent from '@/components/setting';
+import PaymentPage from '@/components/receptionist/Receptionistpayment';
+import authService from '@/context/authService';
 
 const ReceptionistPanel = () => {
   const [activeTab, setActiveTab] = useState('students');

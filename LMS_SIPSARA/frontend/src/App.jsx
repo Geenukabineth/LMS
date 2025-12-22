@@ -1,15 +1,15 @@
 import { Routes, Route } from "react-router-dom";
-import Login from "@/pages/login";
-import Signup from "@/pages/Signup";
-import Suadmin from "@/SUadmin/Suadmin";
-import Teacher from "@/admin/admin";
-import PaymentPage from "./student/PaymentPage";
-import Student from "@/student/user";
-import CourseBrowsePage from "./student/CourseBrowsePage";
-import Receptionist from '@/receptionist/receptionist'
+import Login from "@/components/pages/Login";
+import Signup from "@/components/pages/Signup";
+import Suadmin from "@/components/SUadmin/Suadmin";
+import Teacher from "@/components/admin/admin";
+import PaymentPage from "@/components/student/PaymentPage";
+import Student from "@/components/student/user";
+import CourseBrowsePage from "@/components/student/CourseBrowsePage";
+import Receptionist from '@/components/receptionist/receptionist'
 import ProtectedRouter from "@/config/ProtectedRouter";
-import ForgotPassword from "@/pages/forgot-password/ForgotPassword";
-import TeacherApplication from "@/pages/TeacherApplication";
+import ForgotPassword from "@/components/pages/forgot-password/ForgotPassword";
+import TeacherApplication from "@/components/pages/TeacherApplication";
 import CourseDetailView from "@/components/courseData/Coursedetailview ";
 
 

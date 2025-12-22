@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bell, User, LogOut } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
-import authService from "@/services/authService"; 
+import authService from "@/context/authService"; 
 
 function Topbar() {
   const [activeTab, setActiveTab] = useState("dashboard");

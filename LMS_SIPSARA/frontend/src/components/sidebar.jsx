@@ -1,6 +1,6 @@
 import React from 'react';
-import { Users, Book, BookOpen, DollarSign, LogOut, Settings, MessagesSquare, Home } from 'lucide-react';
-import authService from '@/services/authService';
+import { Users, Book, BookOpen, DollarSign, LogOut, Settings, MessagesSquare, Home,UserRoundCog  } from 'lucide-react';
+import authService from '@/context/authService';
 import logo from '@/assets/master_logo.png';
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
@@ -16,6 +16,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'lecturers', label: 'Lecturers', icon: Users },
+    { id: 'receptionists', label: 'Receptionists', icon: UserRoundCog  },
     { id: 'programs', label: 'Programs & Courses', icon: BookOpen },
     { id: 'payments', label: 'Payments', icon: DollarSign },
     { id: 'announcements', label: 'Announcements', icon: Book },

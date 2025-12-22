@@ -3,7 +3,7 @@ import {
   CreditCard, DollarSign, TrendingUp, AlertCircle, Filter, Download,
   Search, Eye, RefreshCw, CheckCircle, XCircle, Clock, MoreVertical
 } from 'lucide-react';
-import authService from '@/services/authService'; // Adjust path if needed
+import authService from '@/context/authService'; // Adjust path if needed
 
 const AdminPaymentPanel = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');

@@ -3,11 +3,11 @@ import { BarChart2, BookOpen, FileText, FileVideo, CreditCard, Settings, Message
 import Topbar from '@/components/topbar'
 import SettingsPanel from '@/components/setting';
 import TeamsLMSChat from '@/components/chat';
-import StudentCourseView from '../components/courseData/Studentcourseview';
+import StudentCourseView from '@/components/courseData/Studentcourseview';
 
-import StudentAssignments from './StudentAssignments';
-import StudentPaymentHistory from './StudentPaymentHistory';
-import CourseBrowsePage from './CourseBrowsePage';
+import StudentAssignments from '@/components/Student/StudentAssignments';
+import StudentPaymentHistory from '@/components/Student/StudentPaymentHistory';
+import CourseBrowsePage from '@/components/Student/CourseBrowsePage';
 import Chatbot from '@/components/aibot';
 
 

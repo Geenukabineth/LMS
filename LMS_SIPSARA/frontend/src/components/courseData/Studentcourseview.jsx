@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '@/services/authService';
+import authService from '@/context/authService';
 import {
   BookOpen,
   Clock,

@@ -20,7 +20,7 @@ import AssignmentQuizPanel from '../courseData/quiz';
 import TeacherFeedbackPanel from '../courseData/feedback';
 import SettingsPanel from '@/components/setting';
 import TeamsLMSChat from '@/components/chat';
-import authService from '@/services/authService';
+import authService from '@/context/authService';
 import TeacherPaymentPage from '@/components/data/Teacherpaymentpage ';
 
 const WelcomeCard = ({ teacherName }) => (

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { ShoppingCart, Search, X, User, BookOpen, Star, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import authService from '@/services/authService';
+import authService from '@/context/authService';
 
 const API_BASE_URL = 'http://localhost:8000';
 

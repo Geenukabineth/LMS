@@ -48,12 +48,15 @@ urlpatterns = [
     path("register/teacher/<int:id>/", TeacherRegisterView.as_view(), name="teacher_detail"),
     path("teacher/delete/<int:id>/", TeacherRegisterView.as_view(), name="teacher_delete"),
     
+    path("register/receptionist/", ReceptionRegisterlistView.as_view(), name="receptionist_register"),
+    path("receptionist/delete/<int:id>/", ReceptionRegisterlistView.as_view(), name="receptionist_delete"),
+    path("receptionist/<int:id>/", ReceptionRegisterlistView.as_view(), name="receptionist_detail"),
+    path("receptionist/", ReceptionRegisterlistView.as_view(), name="receptionist_list"),
+    
     
     
     # Receptionist endpoints
-    path("reception/register/", ReceptionRegisterView.as_view(), name="reception_register"),
-
-    path("register/receptionist/", ReceptionRegisterlistView.as_view(), name="receptionist_register"),
+    path("reception/register/", ReceptionRegisterView.as_view(), name="reception_register"),    
     path("register/receptionist/<int:id>/", ReceptionRegisterView.as_view(), name="receptionist_detail"),
     path("register/receptionist/student/list/", ReceptionRegisterView.as_view(), name="receptionist_list"),
     

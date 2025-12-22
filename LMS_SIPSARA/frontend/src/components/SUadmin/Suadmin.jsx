@@ -6,12 +6,14 @@ import AnnouncementPanel from '@/components/AnnouncementPanel';
 import PaymentData from '@/components/data/paymentdata';
 import CourseCreator from '@/components/courseData/course';
 import TeamsLMSChat from '@/components/chat';
-import UserDataPanel from '@/components/data/userdata';
+import UserDataPanel from '@/components/SUadmin/teacheradd';
 import Topbar from '@/components/topbar';
+import ReceptionistManagementPanel from '@/components/SUadmin/receptionistadd';
 import SettingsPanel from '@/components/setting';
-import authService  from '@/services/authService'; 
-import { API_USER_ENDPOINTS } from '@/config/userapi'; 
-import { API_COURSE_ENDPOINTS } from '@/config/courseapi'; 
+import authService  from '@/context/authService'; 
+import { userService } from '@/config/user.config';
+import { courseService } from '@/config/course.config';
+
 
 
 
@@ -144,131 +146,56 @@ export default function AdminDashboard() {
 
   // ✅ Fetch student count with auth service
 useEffect(() => {
-  const fetchStudentCount = async () => {
+  const loadStudents = async () => {
     try {
-      const response = await fetchWithAuth(API_USER_ENDPOINTS.STUDENT_LIST);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch students: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      console.log("Student API data:", data);
-
-      setStudentsCount(data?.count ?? 0);
-    } catch (error) {
-      console.error("Error fetching student count:", error);
+      setStudentsCount(await userService.getStudentsCount());
+    } catch (err) {
+      console.error(err);
       setStudentsCount(0);
     }
   };
-
-  fetchStudentCount();
-}, []);
-
-
-   
+  loadStudents();
+}, []); 
 
 
   // ✅ Fetch teacher count with auth service
   useEffect(() => {
-  const fetchTeacherCount = async () => {
+  const loadTeachers = async () => {
     try {
-      const response = await fetchWithAuth(API_USER_ENDPOINTS.TEACHER_LIST);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch teacher: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      console.log("Teacher API data:", data);
-
-      // ✅ This WILL work now
-      setTeacherCount(data?.count ?? 0);
-
-    } catch (error) {
-      console.error("Error fetching teacher count:", error);
+      setTeacherCount(await userService.getTeachersCount());
+    } catch (err) {
+      console.error(err);
       setTeacherCount(0);
     }
   };
-
-  fetchTeacherCount();
+  loadTeachers();
 }, []);
 
 
   // ✅ Fetch courses count with auth service
   useEffect(() => {
-    const fetchCoursesCount = async () => {
-      try {
-        const response = await fetchWithAuth(API_COURSE_ENDPOINTS.COURSE_LIST);
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            console.warn('Authentication expired, attempting refresh...');
-            await authService.refreshToken();
-            const retryResponse = await fetchWithAuth(API_COURSE_ENDPOINTS.COURSE_LIST);
-            if (!retryResponse.ok) throw new Error('Failed after token refresh');
-            const data = await retryResponse.json();
-            processCoursesData(data);
-            return;
-          }
-          throw new Error(`Failed to fetch courses: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        processCoursesData(data);
-        
-      } catch (error) {
-        console.error("Error fetching courses count:", error);
-        setCoursesCount(0);
-      }
-    };
-
-    const processCoursesData = (data) => {
-      console.log('Courses data:', data);
-      
-      let count = 0;
-      if (data.count !== undefined) {
-        count = data.count;
-      } else if (data.courses && Array.isArray(data.courses)) {
-        count = data.courses.length;
-      } else if (Array.isArray(data)) {
-        count = data.length;
-      } else if (data.results && Array.isArray(data.results)) {
-        count = data.results.length;
-      }
-      
-      setCoursesCount(count);
-      console.log('Courses count set to:', count);
-    };
-
-    fetchCoursesCount();
-  }, []);
+  const loadCourses = async () => {
+    try {
+      setCoursesCount(await courseService.getCoursesCount());
+    } catch (err) {
+      console.error(err);
+      setCoursesCount(0);
+    }
+  };
+  loadCourses();
+}, []);
 
   // ✅ Fetch receptionist count with auth service
   useEffect(() => {
-    const fetchReceptionistsCount = async () => {
-      try {
-        const response = await fetchWithAuth(API_USER_ENDPOINTS.RECEPTIONIST_LIST);
-        
-        if (!response.ok) {
-        throw new Error(`Failed to fetch receptionists: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      console.log("Receptionist API data:", data);
-
-      setReceptionistsCount(data?.count ?? 0);
-
-    } catch (error) {
-      console.error("Error fetching receptionist count:", error);
+  const loadReceptionists = async () => {
+    try {
+      setReceptionistsCount(await userService.getReceptionistsCount());
+    } catch (err) {
+      console.error(err);
       setReceptionistsCount(0);
     }
   };
-
-  fetchReceptionistsCount();
+  loadReceptionists();
 }, []);
 
   useEffect(() => {
@@ -574,6 +501,7 @@ useEffect(() => {
           {activeTab === 'programs' && <CourseCreator />}
           {activeTab === 'announcements' && <AnnouncementPanel />}
           {activeTab === 'lecturers' && <UserDataPanel />}
+          {activeTab === 'receptionists' && <ReceptionistManagementPanel />}
           {activeTab === 'chat' && <TeamsLMSChat />}
           {activeTab === 'settings' && <SettingsPanel />}
         </main>

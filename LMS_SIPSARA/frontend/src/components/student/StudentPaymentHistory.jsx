@@ -1,7 +1,7 @@
 // StudentPaymentHistory.jsx
 import { useState, useEffect } from 'react';
 import { CreditCard, Calendar, Download, CheckCircle, Receipt } from 'lucide-react';
-import authService from '@/services/authService';
+import authService from '@/context/authService';
 
 function StudentPaymentHistory() {
   const [payments, setPayments] = useState([]);
