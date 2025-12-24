@@ -1,4 +1,3 @@
-# payment/management/commands/seed_payment.py
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from decimal import Decimal
@@ -54,8 +53,9 @@ class Command(BaseCommand):
 
         # --- CartOrders and CartOrderItems ---
         for user in users:
+            # Shortuuid fix included here ([:20])
             order = CartOrder.objects.create(
-                oid=shortuuid.uuid(),
+                oid=shortuuid.uuid()[:20], 
                 student=user,
                 sub_total=Decimal('0.00'),
                 total_amount=Decimal('0.00'),
@@ -105,10 +105,19 @@ class Command(BaseCommand):
                 admin_amount = transaction.amount * Decimal('0.1')
 
                 # Teacher earning
+                # FIX: Access .user from the teacher object
+                teacher_user = None
+                if hasattr(course, 'teacher') and course.teacher:
+                    # Check if teacher object itself is a user or has a user relation
+                    if isinstance(course.teacher, User):
+                         teacher_user = course.teacher
+                    elif hasattr(course.teacher, 'user'):
+                         teacher_user = course.teacher.user
+
                 Earning.objects.create(
                     transaction=transaction,
                     course=course,
-                    user=course.teacher if hasattr(course, 'teacher') else None,
+                    user=teacher_user,
                     amount=teacher_amount,
                     earning_type='teacher'
                 )

@@ -44,7 +44,7 @@ function AdminCourseCreator({ isOpen, onClose = () => {}, onCourseCreated = () =
         // ✅ Django Model uses 'Department' (Capital D)
         department: course.Department || course.department || "", 
         // ✅ Normalized to string so the <select> matches the ID correctly
-        teacher: course.teacher?.id?.toString() || course.teacher?.toString() || "",
+        teacher: course.teacher_id?.toString() || course.teacher?.toString() || "",
         platform_status: course.platform_status || "published",
         featured: course.featured || false,
       });

@@ -216,6 +216,23 @@ class AdminCourseCreateSerializer(serializers.ModelSerializer):
         validated_data['assignment_status'] = 'pending'
         return super().create(validated_data)
 
+
+class AdminCourseUpdateSerializer(serializers.ModelSerializer):
+    Department = serializers.CharField(required=False)
+
+    teacher = serializers.PrimaryKeyRelatedField(
+        queryset=Teacher.objects.all(),
+        required=False
+    )
+
+    class Meta:
+        model = Course
+        fields = [
+            "title", "description", "price", "language", "level",
+            "Department", "platform_status", "featured",
+            "image", "file", "teacher",
+        ]
+
  
 class CourseCreateSerializer(serializers.ModelSerializer):
     """Serializer for teacher creating courses (deprecated but kept for backward compatibility)."""

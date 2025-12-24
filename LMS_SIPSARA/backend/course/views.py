@@ -18,7 +18,7 @@ from .models import (
 from .serializers import (
     CourseSerializer, CourseCreateSerializer, AdminCourseCreateSerializer,
     EnrolledCourseSerializer, ModuleSerializer, LessonSerializer, ReviewSerializer, FileUploadSerializer,
-    StudentEnrolledCoursesSerializer, ReceptionistEnrollmentSerializer, BulkEnrollmentCreateSerializer
+    StudentEnrolledCoursesSerializer, ReceptionistEnrollmentSerializer, BulkEnrollmentCreateSerializer,AdminCourseUpdateSerializer
 )
 
 from lms.models import Teacher, User, Profile,Student # Profile added for clean access in Enrollment views
@@ -1486,7 +1486,8 @@ class EnrolledCourseListAPIView(ListAPIView):
 
 class AdminCourseListAPIView(ListAPIView):
     serializer_class = CourseSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]    
+    parser_classes = (MultiPartParser, FormParser)  # IMPORTANT for FormData
 
     def get_queryset(self):
         
@@ -1526,36 +1527,39 @@ class AdminCourseListAPIView(ListAPIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # --- PUT: Update Course (Admin Only) ---
     def put(self, request, *args, **kwargs):
         if not request.user.is_staff:
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-        
-        # Expecting 'course_id' in query params or request data
-        course_id = request.data.get('id') or request.query_params.get('id')
+
+        course_id = (
+            kwargs.get("course_id") or
+            request.data.get("id") or
+            request.query_params.get("id")
+        )
         if not course_id:
             return Response({"detail": "ID is required for update."}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         course = get_object_or_404(Course, id=course_id)
-        serializer = CourseSerializer(course, data=request.data, partial=True, context={'request': request})
-        
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        write_serializer = AdminCourseUpdateSerializer(course, data=request.data, partial=True, context={"request": request})
+        write_serializer.is_valid(raise_exception=True)
+        course = write_serializer.save()
+
+        return Response(CourseSerializer(course, context={"request": request}).data, status=status.HTTP_200_OK)
 
     # --- DELETE: Remove Course (Admin Only) ---
     def delete(self, request, *args, **kwargs):
         if not request.user.is_staff:
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
             
-        course_id = request.data.get('id') or request.query_params.get('id')
-        if not course_id:
-            return Response({"detail": "ID is required for deletion."}, status=status.HTTP_400_BAD_REQUEST)
-            
+        course_id = (
+            kwargs.get("course_id") or
+            request.data.get("id") or
+            request.query_params.get("id")
+        )            
         course = get_object_or_404(Course, id=course_id)
         course.delete()
-        return Response({"detail": "Course deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"detail": "Course deleted successfully."}, status=status.HTTP_200_OK)
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

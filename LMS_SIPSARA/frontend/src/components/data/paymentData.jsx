@@ -4,6 +4,7 @@ import {
   Search, Eye, RefreshCw, CheckCircle, XCircle, Clock, MoreVertical
 } from 'lucide-react';
 import authService from '@/context/authService'; // Adjust path if needed
+import {paymentService} from '@/config/payment.config';
 
 const AdminPaymentPanel = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -15,24 +16,8 @@ const AdminPaymentPanel = () => {
 
   const fetchPayments = async () => {
     try {
-      const token = authService.getToken();
+      const data = await paymentService.getPaymentMethods();        
       
-      // NEW URL: Matches the Django url added below
-      const response = await fetch('http://127.0.0.1:8000/payment/admin/summary/', { 
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`, 
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Normalize data to match your UI variable names exactly
       const normalizedData = data.map(item => ({
         id: item.id,
         description: item.description, // "Order #OID..."
