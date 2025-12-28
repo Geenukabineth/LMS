@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     "lms",
     "course",
-    "notification",
+    'notification.apps.NotificationConfig',
     "payment",
     "channels",
     "chatbot",

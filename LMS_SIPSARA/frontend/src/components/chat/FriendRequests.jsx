@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+import notificationConfig from "@/config/notification.config";
+
 
 const FriendRequests = ({
   requests,
@@ -12,9 +13,9 @@ const FriendRequests = ({
   const handleAccept = async (requestId) => {
     setLoadingId(requestId);
     try {
-      await apiCall(API_ENDPOINTS.FRIEND_REQUEST_ACCEPT(requestId), {
-        method: 'POST',
-      });
+      const data = await notificationConfig.FRIEND_REQUEST_ACCEPT(requestId);
+      onAccept?.(data);
+      
 
       onNotification?.({
         type: 'success',
@@ -36,9 +37,8 @@ const FriendRequests = ({
   const handleReject = async (requestId) => {
     setLoadingId(requestId);
     try {
-      await apiCall(API_ENDPOINTS.FRIEND_REQUEST_REJECT(requestId), {
-        method: 'POST',
-      });
+      const data = await notificationConfig.FRIEND_REQUEST_REJECT(requestId);
+      onReject?.(data);
 
       onNotification?.({
         type: 'success',

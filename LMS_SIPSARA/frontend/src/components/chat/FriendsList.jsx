@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Users, X } from 'lucide-react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+import notificationConfig from "@/config/notification.config";
 
 const FriendsList = ({
   friends,
@@ -14,20 +14,21 @@ const FriendsList = ({
 
   const handleStartChat = async (friend) => {
     try {
-      const response = await apiCall(API_ENDPOINTS.START_CHAT, {
-        method: 'POST',
-        body: JSON.stringify({
-          user_id: friend.id,
-        }),
+      // ✅ FIX: Pass the required payload to the API
+      const data = await notificationConfig.START_CHAT({ 
+        to_user_id: friend.id 
       });
-
-      if (response) {
-        onSelectChat?.(response);
-      }
+      
+      onSelectChat?.(data);
     } catch (error) {
       console.error('Error starting chat:', error);
-      // Try to find existing chat
-      const existingChat = chats.find((c) => c.user?.id === friend.id);
+      
+      // Fallback: Try to find existing chat in local state if API fails
+      const existingChat = chats.find((c) => {
+         // Check participants to find the chat with this friend
+         return c.participants && c.participants.some(p => p.id === friend.id);
+      });
+
       if (existingChat) {
         onSelectChat?.(existingChat);
       } else {
@@ -42,19 +43,19 @@ const FriendsList = ({
   const handleRemoveFriend = async (friendId) => {
     setRemovingId(friendId);
     try {
-      await apiCall(API_ENDPOINTS.REMOVE_FRIEND, {
-        method: 'POST',
-        body: JSON.stringify({
-          friend_id: friendId,
-        }),
-      });
+      // Assuming REMOVE_FRIEND takes the ID directly as an argument based on previous config
+      const data = await notificationConfig.REMOVE_FRIEND(friendId); 
+      onRemoveFriend?.(data);
 
       onNotification?.({
         type: 'success',
         message: 'Friend removed',
       });
-
-      onRemoveFriend?.(friendId);
+      
+      // Optimistically update parent state if needed
+      if (typeof onRemoveFriend === 'function') {
+         onRemoveFriend(friendId);
+      }
     } catch (error) {
       console.error('Error removing friend:', error);
       onNotification?.({
@@ -99,7 +100,7 @@ const FriendsList = ({
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {friend.full_name  || friend.username}
+                  {friend.full_name || friend.username}
                 </p>
                 {onlineUsers.has(friend.id) ? (
                   <p className="text-xs text-green-600">Online</p>

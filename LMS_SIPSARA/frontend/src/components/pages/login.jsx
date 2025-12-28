@@ -120,6 +120,14 @@ function Login() {
             />
             <label className="ml-2 text-sm">Remember me</label>
           </div>
+          <p className="mt-2 text-sm text-right">
+            <a
+              href="/ForgotPassword"
+              className="text-indigo-600 hover:underline"
+            >
+              Forgot password?
+            </a>
+          </p>
 
           <button
             type="submit"

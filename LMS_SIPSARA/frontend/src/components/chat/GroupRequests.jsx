@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+import notificationConfig from "@/config/notification.config";
+
 
 const GroupRequests = ({
   requests,
@@ -12,12 +13,9 @@ const GroupRequests = ({
   const handleAccept = async (requestId) => {
     setLoadingId(requestId);
     try {
-      const response = await apiCall(
-        `${API_ENDPOINTS.NOTIFICATIONS}${requestId}/mark_as_read/`,
-        {
-          method: 'POST',
-        }
-      );
+      const response = await notificationConfig.MARK_AS_READ(requestId);
+
+        
 
       onNotification?.({
         type: 'success',
@@ -39,12 +37,7 @@ const GroupRequests = ({
   const handleReject = async (requestId) => {
     setLoadingId(requestId);
     try {
-      await apiCall(
-        `${API_ENDPOINTS.NOTIFICATIONS}${requestId}/`,
-        {
-          method: 'DELETE',
-        }
-      );
+      await notificationConfig.NOTIFICATIONS(requestId);       
 
       onNotification?.({
         type: 'success',

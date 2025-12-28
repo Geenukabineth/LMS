@@ -49,6 +49,8 @@ function AdminCourseCreator({ isOpen, onClose = () => {}, onCourseCreated = () =
         featured: course.featured || false,
       });
       if (course.image) setPreview(course.image);
+      setImageFile(null);
+      setPreview(course.image || null);
     } else if (!course && isOpen) {
       setCourseData({
         title: "", description: "", price: "", language: "English",
@@ -168,30 +170,30 @@ function AdminCourseCreator({ isOpen, onClose = () => {}, onCourseCreated = () =
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-        <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-          <h3 className="text-xl font-bold flex items-center gap-2 text-gray-800">
+        <div className="flex items-center justify-between p-6 border-b bg-gray-50">
+          <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
             <BookOpen className="text-blue-600" /> 
             {course ? "Edit Course Settings" : "New Course Settings"}
           </h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X /></button>
+          <button onClick={onClose} className="p-2 transition-colors rounded-full hover:bg-gray-200"><X /></button>
         </div>
 
         {error && (
-          <div className="mx-6 mt-4 bg-red-50 border-l-4 border-red-500 p-4 flex gap-3">
+          <div className="flex gap-3 p-4 mx-6 mt-4 border-l-4 border-red-500 bg-red-50">
             <AlertCircle className="text-red-600 shrink-0" />
             <p className="text-sm text-red-700 whitespace-pre-wrap">{error}</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2"><FileText size={16}/> Title *</label>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><FileText size={16}/> Title *</label>
               <input type="text" name="title" value={courseData.title} onChange={handleInputChange} className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none" required />
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2"><DollarSign size={16}/> Price</label>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><DollarSign size={16}/> Price</label>
               <input type="number" name="price" value={courseData.price} onChange={handleInputChange} className="w-full border rounded-lg p-2.5" step="0.01" />
             </div>
 
@@ -204,7 +206,7 @@ function AdminCourseCreator({ isOpen, onClose = () => {}, onCourseCreated = () =
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Users size={16}/> Assigned Teacher *</label>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Users size={16}/> Assigned Teacher *</label>
               <select name="teacher" value={courseData.teacher} onChange={handleInputChange} className="w-full border rounded-lg p-2.5 bg-white" required>
                 <option value="">Select Teacher</option>
                 {/* ✅ Normalizing comparison to string prevents selection failure */}
@@ -215,29 +217,29 @@ function AdminCourseCreator({ isOpen, onClose = () => {}, onCourseCreated = () =
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2"><GraduationCap size={16}/> Course Level</label>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><GraduationCap size={16}/> Course Level</label>
               <select name="level" value={courseData.level} onChange={handleInputChange} className="w-full border rounded-lg p-2.5 bg-white">
                 {levels.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Globe size={16}/> Language</label>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Globe size={16}/> Language</label>
               <select name="language" value={courseData.language} onChange={handleInputChange} className="w-full border rounded-lg p-2.5 bg-white">
                 {languages.map(lang => <option key={lang} value={lang}>{lang}</option>)}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Activity size={16}/> Platform Status</label>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Activity size={16}/> Platform Status</label>
               <select name="platform_status" value={courseData.platform_status} onChange={handleInputChange} className="w-full border rounded-lg p-2.5 bg-white">
                 {platformStatuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
 
             <div className="flex items-center gap-2 pt-8">
-              <input type="checkbox" id="featured" name="featured" checked={courseData.featured} onChange={handleInputChange} className="w-5 h-5 accent-blue-600 cursor-pointer" />
-              <label htmlFor="featured" className="text-sm font-semibold text-gray-700 flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="featured" name="featured" checked={courseData.featured} onChange={handleInputChange} className="w-5 h-5 cursor-pointer accent-blue-600" />
+              <label htmlFor="featured" className="flex items-center gap-2 text-sm font-semibold text-gray-700 cursor-pointer">
                 <Star size={16} className={courseData.featured ? "text-yellow-500 fill-yellow-500" : ""} /> Featured Course
               </label>
             </div>
@@ -248,18 +250,18 @@ function AdminCourseCreator({ isOpen, onClose = () => {}, onCourseCreated = () =
             <textarea name="description" value={courseData.description} onChange={handleInputChange} className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none" rows="3" required />
           </div>
 
-          <div className="p-4 border-2 border-dashed border-gray-200 rounded-xl space-y-4">
+          <div className="p-4 space-y-4 border-2 border-gray-200 border-dashed rounded-xl">
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold text-gray-700">Thumbnail Image</label>
-              <input type="file" name="image" accept="image/*" onChange={handleInputChange} className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+              <input type="file" name="image" accept="image/*" onChange={handleInputChange} className="text-sm text-gray-500 cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
             </div>
-            {preview && <img src={preview} alt="Preview" className="w-full h-40 object-cover rounded-lg border shadow-sm" />}
+            {preview && <img src={preview} alt="Preview" className="object-cover w-full h-40 border rounded-lg shadow-sm" />}
           </div>
 
-          <div className="flex justify-end gap-3 pt-6 border-t mt-4">
+          <div className="flex justify-end gap-3 pt-6 mt-4 border-t">
             <button type="button" onClick={onClose} className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">Cancel</button>
             <button type="submit" disabled={loading} className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
-              {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <Check className="w-4 h-4" />}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {loading ? (course ? "Updating..." : "Creating...") : (course ? "Update Course" : "Create Course")}
             </button>
           </div>

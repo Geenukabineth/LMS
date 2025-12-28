@@ -1,158 +1,292 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import authService from '@/context/authService';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import React, { useEffect, useMemo, useState } from "react";
+import { X, Loader, AlertCircle, CheckCircle } from "lucide-react";
+import authService from "@/context/authService";
 
-// Replace with your actual Publishable Key
-const stripePromise = loadStripe('pk_test_51RM4XSRcvIaQZdctP3yVc3alQFt3RoKXXA9i4WfldxkfPvuAa6uoBqJpPbySFiMdawFZ3DdIWwgajMVPz58ePtH300p9AxiTMd');
+/**
+ * Addpayment.jsx (UPDATED)
+ *
+ * Supports 2 modes:
+ * 1) Payment Page: choose student from dropdown (allowStudentSelect=true) + NO course required
+ * 2) Enrollment Page: pre-selected student + optional courseId to link payment to a course
+ */
+const Addpayment = ({
+  // If a student is already selected by parent, pass it here:
+  selectedStudent = null,
 
-// 1. create a separate component for the form inside Elements
-const CheckoutForm = ({ orderId, amount }) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const navigate = useNavigate();
-  const [message, setMessage] = useState(null);
+  // If you want dropdown selection inside modal:
+  allowStudentSelect = false,
+  students = [],
+  onStudentChange = null, // optional callback(studentObj)
+
+  // Optional: link payment to a course (ONLY for enrollment flow)
+  courseId = null,
+
+  // Modal control:
+  setShowPaymentModal,
+
+  // Callbacks:
+  onSuccess, // e.g. refresh payment list
+}) => {
+  const token = authService.getToken();
+
+  const [localStudentId, setLocalStudentId] = useState(selectedStudent?.id || "");
+  const [paymentForm, setPaymentForm] = useState({
+    amount: "",
+    method: "Cash",
+    date: new Date().toISOString().split("T")[0],
+    notes: "",
+  });
+
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e) => {
+  // keep dropdown in sync if parent selectedStudent changes
+  useEffect(() => {
+    if (selectedStudent?.id) setLocalStudentId(selectedStudent.id);
+  }, [selectedStudent]);
+
+  const selectedStudentObj = useMemo(() => {
+    if (selectedStudent?.id) return selectedStudent;
+    if (!allowStudentSelect) return null;
+    return students.find((s) => String(s.id) === String(localStudentId)) || null;
+  }, [selectedStudent, allowStudentSelect, students, localStudentId]);
+
+  const getStudentName = (stu) => {
+    if (!stu) return "Unknown";
+    if (stu.firstName && stu.lastName) return `${stu.firstName} ${stu.lastName}`;
+    return stu.name || stu.username || "Unknown";
+  };
+
+  const handleClose = () => {
+    setError(null);
+    setSuccess(false);
+    setShowPaymentModal(false);
+  };
+
+  const validate = () => {
+    if (!selectedStudentObj?.id) {
+      setError("Please select a student");
+      return false;
+    }
+
+    const amountNum = parseFloat(paymentForm.amount);
+    if (!paymentForm.amount || isNaN(amountNum) || amountNum <= 0) {
+      setError("Please enter a valid amount");
+      return false;
+    }
+
+    if (!paymentForm.date) {
+      setError("Please select a payment date");
+      return false;
+    }
+
+    return true;
+  };
+
+  const submitPayment = async (e) => {
     e.preventDefault();
+    if (!validate()) return;
 
-    if (!stripe || !elements) return;
+    try {
+      setIsProcessing(true);
+      setError(null);
 
-    setIsProcessing(true);
+      const amountNum = parseFloat(paymentForm.amount);
 
-    // 2. Confirm the payment using the client_secret found in elements
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: window.location.origin + '/student', // Redirect here on success
-      },
-      redirect: 'if_required', // Prevent redirect if we want to handle it manually
-    });
+      const payload = {
+        student_id: selectedStudentObj.id, // ✅ correct field
+        amount: amountNum,
+        payment_method: paymentForm.method,
+        payment_date: paymentForm.date,
+        notes: paymentForm.notes,
+      };
 
-    if (error) {
-      setMessage(error.message);
-      setIsProcessing(false);
-    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-      
-      // 3. Tell backend to fulfill the order (Optional if you rely on Webhooks)
-      const token = authService.getToken();
-      await fetch('http://localhost:8000/payment/confirm-payment/', {
-        method: 'POST',
+      // ✅ Only include course_id if you WANT to link payment to a course (enrollment flow)
+      if (courseId) payload.course_id = courseId;
+
+      const response = await fetch("http://localhost:8000/payment/record-payment/", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ payment_intent_id: paymentIntent.id })
+        body: JSON.stringify(payload),
       });
 
-      setMessage('Payment Successful!');
-      setTimeout(() => {
-        navigate('/student', { 
-            state: { message: 'Payment successful! Courses Enrolled.' } 
-        });
-      }, 2000);
-    } else {
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || data?.detail || "Failed to record payment");
+      }
+
+      setSuccess(true);
+
+      if (typeof onSuccess === "function") {
+        await onSuccess(data);
+      }
+
+      setTimeout(() => handleClose(), 1200);
+    } catch (err) {
+      setError(err.message || "Payment failed");
+    } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-6 bg-white rounded-lg shadow-md">
-      <h2 className="mb-4 text-xl font-bold">Pay LKR {amount}</h2>
-      {/* This replaces all your manual inputs */}
-      <PaymentElement /> 
-      
-      {message && <div className="mt-4 text-sm text-red-500">{message}</div>}
-      
-      <button 
-        disabled={isProcessing || !stripe || !elements} 
-        className="w-full py-3 mt-6 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400"
-      >
-        {isProcessing ? "Processing..." : "Pay Now"}
-      </button>
-    </form>
-  );
-};
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Add Payment</h3>
+          <button
+            onClick={handleClose}
+            disabled={isProcessing}
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-const PaymentPage = () => {
-  const navigate = useNavigate();
-  const [clientSecret, setClientSecret] = useState("");
-  const [orderId, setOrderId] = useState(null);
-  const [totalAmount, setTotalAmount] = useState(0);
-
-  useEffect(() => {
-    // Initialize Order and Payment Intent
-    const initializePayment = async () => {
-      const storedCheckoutData = localStorage.getItem('checkoutData');
-      const storedCart = localStorage.getItem('checkoutCart');
-      
-      if (!storedCheckoutData || !storedCart) {
-        navigate('/student');
-        return;
-      }
-
-      const checkoutData = JSON.parse(storedCheckoutData);
-      const cart = JSON.parse(storedCart);
-      const token = authService.getToken();
-
-      try {
-        // A. Create Order
-        const orderResponse = await fetch('http://localhost:8000/payment/orders/create/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ coupon_code: "" }) // Add coupon logic if needed
-        });
-        
-        const orderResult = await orderResponse.json();
-        if (!orderResponse.ok) throw new Error(orderResult.error);
-        
-        setOrderId(orderResult.oid);
-        setTotalAmount(orderResult.order.total_amount);
-
-        // B. Create Payment Intent
-        const intentResponse = await fetch('http://localhost:8000/payment/payments/process/', { // This maps to CreatePaymentIntentView
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ order_id: orderResult.oid })
-        });
-
-        const intentResult = await intentResponse.json();
-        if (!intentResponse.ok) throw new Error(intentResult.error);
-
-        // Store the secret needed by Elements
-        setClientSecret(intentResult.client_secret);
-
-      } catch (error) {
-        console.error("Initialization Error:", error);
-        alert("Failed to initialize payment");
-      }
-    };
-
-    initializePayment();
-  }, [navigate]);
-
-  const options = {
-    clientSecret,
-    appearance: { theme: 'stripe' },
-  };
-
-  return (
-    <div className="min-h-screen px-4 py-12 bg-gray-50">
-      <div className="max-w-xl mx-auto">
-        <h1 className="mb-8 text-3xl font-bold text-center">Secure Checkout</h1>
-        
-        {clientSecret ? (
-          <Elements stripe={stripePromise} options={options}>
-            <CheckoutForm orderId={orderId} amount={totalAmount} />
-          </Elements>
-        ) : (
-          <div className="text-center">Loading Payment Securely...</div>
+        {/* Success */}
+        {success && (
+          <div className="p-3 mb-4 border border-green-200 rounded-lg bg-green-50">
+            <div className="flex items-center gap-2 text-green-800">
+              <CheckCircle size={18} />
+              <span className="text-sm font-medium">Payment recorded successfully</span>
+            </div>
+          </div>
         )}
+
+        {/* Error */}
+        {error && (
+          <div className="p-3 mb-4 border border-red-200 rounded-lg bg-red-50">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle size={18} />
+              <span className="text-sm">{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Student dropdown (ONLY if allowStudentSelect=true) */}
+        {allowStudentSelect && (
+          <div className="mb-4">
+            <label className="block mb-1 text-sm font-medium text-gray-700">Student</label>
+            <select
+              value={localStudentId}
+              onChange={(e) => {
+                const sid = e.target.value;
+                setLocalStudentId(sid);
+                const stu = students.find((s) => String(s.id) === String(sid)) || null;
+                if (typeof onStudentChange === "function") onStudentChange(stu);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">-- Select a student --</option>
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {getStudentName(s)} ({s.email || "no email"})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Student summary */}
+        {selectedStudentObj && (
+          <div className="p-3 mb-4 border border-blue-100 rounded-lg bg-blue-50">
+            <p className="font-semibold text-gray-900">{getStudentName(selectedStudentObj)}</p>
+            <p className="text-sm text-gray-600">{selectedStudentObj.email || "N/A"}</p>
+            <p className="text-xs text-gray-500">Student ID: {selectedStudentObj.id}</p>
+          </div>
+        )}
+
+        <form onSubmit={submitPayment} className="space-y-4">
+          {/* Amount */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Payment Amount</label>
+            <input
+              type="number"
+              step="0.01"
+              value={paymentForm.amount}
+              onChange={(e) => setPaymentForm((p) => ({ ...p, amount: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="e.g. 5000"
+              disabled={isProcessing}
+            />
+          </div>
+
+          {/* Method */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Payment Method</label>
+            <select
+              value={paymentForm.method}
+              onChange={(e) => setPaymentForm((p) => ({ ...p, method: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              disabled={isProcessing}
+            >
+              <option value="Cash">Cash</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Check">Check</option>
+              <option value="Card">Card</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          {/* Date */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Payment Date</label>
+            <input
+              type="date"
+              value={paymentForm.date}
+              onChange={(e) => setPaymentForm((p) => ({ ...p, date: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              disabled={isProcessing}
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Notes (Optional)</label>
+            <textarea
+              value={paymentForm.notes}
+              onChange={(e) => setPaymentForm((p) => ({ ...p, notes: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={3}
+              disabled={isProcessing}
+              placeholder="Reference / note..."
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={isProcessing}
+              className="flex items-center justify-center flex-1 px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-60"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                "Process Payment"
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
 
-export default PaymentPage;
+export default Addpayment;

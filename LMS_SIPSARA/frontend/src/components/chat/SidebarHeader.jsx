@@ -1,95 +1,72 @@
-import React, { useState, useEffect } from 'react';
-import { Search, LogOut, Settings } from 'lucide-react';
-// import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+import React, { useEffect, useState } from "react";
+import { Search } from "lucide-react";
+import { userService } from "@/config/user.config";
 
 const SidebarHeader = ({
   activeTab,
   onTabChange,
   searchQuery,
   onSearchChange,
-  onLogout,
   unreadCount = 0,
 }) => {
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [user, setUser] = useState(null);
+  const [profileImage, setProfileImage] = useState(null);
 
-  // Fetch current user info (optional)
   useEffect(() => {
-    const fetchUserInfo = async () => {
+    const loadUser = async () => {
       try {
-        const token = localStorage.getItem('access_token');
-        if (token) {
-          // You can fetch user info from your backend
-          // For now, just get from localStorage if stored
-          const userData = localStorage.getItem('user');
-          if (userData) {
-            setCurrentUser(JSON.parse(userData));
-          }
+        const data = await userService.getUserProfile();
+        setUser(data);
+
+        // ✅ IMAGE COMES FROM profile.image (based on your API response)
+        const imagePath = data?.profile?.image;
+
+        if (imagePath) {
+          const fullUrl = imagePath.startsWith("http")
+            ? imagePath
+            : `http://localhost:8000${imagePath}`;
+
+          setProfileImage(fullUrl);
+        } else {
+          setProfileImage(null);
         }
       } catch (error) {
-        console.error('Error fetching user info:', error);
+        console.error("Failed to load user profile", error);
+        setUser(null);
+        setProfileImage(null);
       }
     };
 
-    fetchUserInfo();
+    loadUser();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    onLogout?.();
-  };
-
   return (
-    <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-purple-600 to-purple-700">
-      {/* Header with title and user menu */}
+    <div className="p-4 bg-white border-b border-gray-200">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-white">Messages</h1>
+        <h1 className="text-2xl font-bold text-black">Messages</h1>
 
-        {/* User menu button */}
-        <div className="relative">
-          <button
-            onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center justify-center w-10 h-10 text-white transition bg-purple-500 rounded-full hover:bg-purple-400"
-            title="User menu"
-          >
-            {currentUser?.full_name ?.[0]?.toUpperCase() || 'U'}
-          </button>
-
-          {/* User dropdown menu */}
-          {showUserMenu && (
-            <div className="absolute right-0 z-50 mt-2 text-gray-900 bg-white rounded-lg shadow-lg min-w-max">
-              {currentUser && (
-                <>
-                  <div className="px-4 py-3 border-b border-gray-200">
-                    <p className="text-sm font-semibold">{currentUser.full_name }</p>
-                    <p className="text-xs text-gray-500">{currentUser.email}</p>
-                  </div>
-                </>
-              )}
-
-              <button
-                className="flex items-center w-full gap-2 px-4 py-2 text-sm text-left hover:bg-gray-100"
-                title="Settings (coming soon)"
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </button>
-
-              <button
-                onClick={handleLogout}
-                className="flex items-center w-full gap-2 px-4 py-2 text-sm text-left text-red-600 border-t border-gray-200 hover:bg-red-50"
-              >
-                <LogOut className="w-4 h-4" />
-                Logout
-              </button>
-            </div>
+        {/* Profile Image */}
+        <div className="flex items-center justify-center w-10 h-10 overflow-hidden bg-purple-500 rounded-full">
+          {profileImage ? (
+            <img
+              src={profileImage}
+              alt="Profile"
+              className="object-cover w-full h-full"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                setProfileImage(null);
+              }}
+            />
+          ) : (
+            <span className="font-bold text-white">
+              {user?.username?.[0]?.toUpperCase() || "U"}
+            </span>
           )}
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search */}
       <div className="relative mb-4">
         <Search className="absolute w-5 h-5 text-gray-400 left-3 top-3" />
         <input
@@ -97,49 +74,31 @@ const SidebarHeader = ({
           placeholder="Search users or groups..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full py-2 pl-10 pr-4 text-white placeholder-purple-200 bg-purple-500 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-300"
+          className="w-full py-2 pl-10 pr-4 text-black placeholder-purple-200 rounded-full bg-white-500 focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
       </div>
 
       {/* Tabs */}
-      <div className="flex p-1 space-x-1 bg-purple-500 rounded-full">
-        <button
-          onClick={() => onTabChange('chats')}
-          className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition relative ${
-            activeTab === 'chats'
-              ? 'bg-white text-purple-600'
-              : 'text-white hover:bg-purple-400'
-          }`}
-        >
-          Chats
-          {unreadCount > 0 && (
-            <span className="absolute top-0 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full right-2">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
+      <div className="flex p-1 space-x-1 bg-blue-500 rounded-full">
+        {["chats", "friends", "groups"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => onTabChange(tab)}
+            className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition relative ${
+              activeTab === tab
+                ? "bg-white text-blue-600"
+                : "text-white hover:bg-blue-400"
+            }`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
 
-        <button
-          onClick={() => onTabChange('friends')}
-          className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition ${
-            activeTab === 'friends'
-              ? 'bg-white text-purple-600'
-              : 'text-white hover:bg-purple-400'
-          }`}
-        >
-          Friends
-        </button>
-
-        <button
-          onClick={() => onTabChange('groups')}
-          className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition ${
-            activeTab === 'groups'
-              ? 'bg-white text-purple-600'
-              : 'text-white hover:bg-purple-400'
-          }`}
-        >
-          Groups
-        </button>
+            {tab === "chats" && unreadCount > 0 && (
+              <span className="absolute top-0 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full right-2">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
     </div>
   );

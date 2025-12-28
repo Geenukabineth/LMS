@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Star, MessageSquare, AlertCircle, Filter, Search, Calendar, User, BookOpen, CheckCircle, Clock, X, Eye, Reply, Trash2, Download } from 'lucide-react';
-
+import authService from "@/context/authService";
 const TeacherFeedbackPanel = () => {
   const [activeTab, setActiveTab] = useState('feedback');
   const [searchTerm, setSearchTerm] = useState('');
@@ -197,17 +197,17 @@ const TeacherFeedbackPanel = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="min-h-screen p-6 mx-auto max-w-7xl bg-gray-50">
+      <div className="overflow-hidden bg-white rounded-lg shadow-lg">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
-          <h1 className="text-3xl font-bold mb-2">Feedback & Complaints Dashboard</h1>
+        <div className="p-6 text-white bg-gradient-to-r from-blue-600 to-purple-600">
+          <h1 className="mb-2 text-3xl font-bold">Feedback & Complaints Dashboard</h1>
           <p className="text-blue-100">Manage student feedback and resolve complaints</p>
         </div>
 
         {/* Tab Navigation */}
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+          <nav className="flex px-6 space-x-8">
             <button
               onClick={() => setActiveTab('feedback')}
               className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
@@ -234,17 +234,17 @@ const TeacherFeedbackPanel = () => {
         </div>
 
         {/* Filters and Search */}
-        <div className="p-6 bg-gray-50 border-b">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex flex-col md:flex-row gap-4 items-center">
+        <div className="p-6 border-b bg-gray-50">
+          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+            <div className="flex flex-col items-center gap-4 md:flex-row">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
                 <input
                   type="text"
                   placeholder={`Search ${activeTab}...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                  className="w-64 py-2 pl-10 pr-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               
@@ -277,7 +277,7 @@ const TeacherFeedbackPanel = () => {
             
             <button
               onClick={exportData}
-              className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center"
+              className="flex items-center px-4 py-2 text-white bg-green-500 rounded-md hover:bg-green-600"
             >
               <Download className="w-4 h-4 mr-2" />
               Export Data
@@ -291,8 +291,8 @@ const TeacherFeedbackPanel = () => {
             /* Feedback Section */
             <div className="space-y-4">
               {filteredFeedback.length === 0 ? (
-                <div className="text-center py-12">
-                  <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <div className="py-12 text-center">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                   <p className="text-gray-500">No feedback found matching your criteria.</p>
                 </div>
               ) : (
@@ -303,14 +303,14 @@ const TeacherFeedbackPanel = () => {
                       !feedback.IsRead ? 'border-l-4 border-l-blue-500 bg-blue-50' : 'border-gray-200'
                     }`}
                   >
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-4 mb-2">
+                        <div className="flex items-center mb-2 space-x-4">
                           <div className="flex items-center space-x-2">
                             <User className="w-4 h-4 text-gray-500" />
                             <span className="font-semibold text-gray-800">{feedback.StudentName}</span>
                             {!feedback.IsRead && (
-                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">New</span>
+                              <span className="px-2 py-1 text-xs text-blue-800 bg-blue-100 rounded">New</span>
                             )}
                           </div>
                           <div className="flex items-center space-x-2">
@@ -319,10 +319,10 @@ const TeacherFeedbackPanel = () => {
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-4 mb-3">
+                        <div className="flex items-center mb-3 space-x-4">
                           <div className="flex items-center space-x-1">
                             {renderStars(feedback.Rating)}
-                            <span className="text-sm text-gray-600 ml-2">({feedback.Rating}/5)</span>
+                            <span className="ml-2 text-sm text-gray-600">({feedback.Rating}/5)</span>
                           </div>
                           <div className="flex items-center text-sm text-gray-500">
                             <Calendar className="w-4 h-4 mr-1" />
@@ -351,11 +351,11 @@ const TeacherFeedbackPanel = () => {
                       </div>
                     </div>
                     
-                    <p className="text-gray-700 mb-4">{feedback.Comments}</p>
+                    <p className="mb-4 text-gray-700">{feedback.Comments}</p>
                     
                     {feedback.Response ? (
-                      <div className="bg-green-50 border-l-4 border-green-400 p-3 mt-4">
-                        <p className="text-sm font-medium text-green-800 mb-1">Your Response:</p>
+                      <div className="p-3 mt-4 border-l-4 border-green-400 bg-green-50">
+                        <p className="mb-1 text-sm font-medium text-green-800">Your Response:</p>
                         <p className="text-green-700">{feedback.Response}</p>
                       </div>
                     ) : (
@@ -364,7 +364,7 @@ const TeacherFeedbackPanel = () => {
                           setSelectedFeedback(feedback);
                           setShowResponseModal(true);
                         }}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex items-center"
+                        className="flex items-center px-4 py-2 text-sm text-white bg-blue-500 rounded-md hover:bg-blue-600"
                       >
                         <Reply className="w-4 h-4 mr-2" />
                         Respond
@@ -378,23 +378,23 @@ const TeacherFeedbackPanel = () => {
             /* Complaints Section */
             <div className="space-y-4">
               {filteredComplaints.length === 0 ? (
-                <div className="text-center py-12">
-                  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <div className="py-12 text-center">
+                  <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                   <p className="text-gray-500">No complaints found matching your criteria.</p>
                 </div>
               ) : (
                 filteredComplaints.map((complaint) => (
                   <div
                     key={complaint.ComplaintID}
-                    className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                    className="p-6 transition-shadow bg-white border border-gray-200 rounded-lg hover:shadow-md"
                   >
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-4 mb-2">
+                        <div className="flex items-center mb-2 space-x-4">
                           <div className="flex items-center space-x-2">
                             <User className="w-4 h-4 text-gray-500" />
                             <span className="font-semibold text-gray-800">{complaint.UserName}</span>
-                            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                            <span className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded">
                               {complaint.UserType}
                             </span>
                           </div>
@@ -403,7 +403,7 @@ const TeacherFeedbackPanel = () => {
                           </span>
                         </div>
                         
-                        <div className="flex items-center space-x-4 mb-3 text-sm text-gray-600">
+                        <div className="flex items-center mb-3 space-x-4 text-sm text-gray-600">
                           <span className={`font-medium ${getPriorityColor(complaint.Priority)}`}>
                             {complaint.Priority} Priority
                           </span>
@@ -419,7 +419,7 @@ const TeacherFeedbackPanel = () => {
                         <select
                           value={complaint.Status}
                           onChange={(e) => updateComplaintStatus(complaint.ComplaintID, e.target.value)}
-                          className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="Open">Open</option>
                           <option value="In Progress">In Progress</option>
@@ -435,13 +435,13 @@ const TeacherFeedbackPanel = () => {
                       </div>
                     </div>
                     
-                    <p className="text-gray-700 mb-4">{complaint.IssueDescription}</p>
+                    <p className="mb-4 text-gray-700">{complaint.IssueDescription}</p>
                     
                     {complaint.Response ? (
-                      <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mt-4">
-                        <p className="text-sm font-medium text-blue-800 mb-1">Response:</p>
+                      <div className="p-3 mt-4 border-l-4 border-blue-400 bg-blue-50">
+                        <p className="mb-1 text-sm font-medium text-blue-800">Response:</p>
                         <p className="text-blue-700">{complaint.Response}</p>
-                        <p className="text-xs text-blue-600 mt-2">
+                        <p className="mt-2 text-xs text-blue-600">
                           Last updated: {new Date(complaint.LastUpdated).toLocaleString()}
                         </p>
                       </div>
@@ -451,7 +451,7 @@ const TeacherFeedbackPanel = () => {
                           setSelectedComplaint(complaint);
                           setShowResponseModal(true);
                         }}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex items-center"
+                        className="flex items-center px-4 py-2 text-sm text-white bg-blue-500 rounded-md hover:bg-blue-600"
                       >
                         <Reply className="w-4 h-4 mr-2" />
                         Respond
@@ -460,7 +460,7 @@ const TeacherFeedbackPanel = () => {
                     
                     {complaint.ResolutionDate && (
                       <div className="mt-3 text-sm text-green-600">
-                        <CheckCircle className="w-4 h-4 inline mr-1" />
+                        <CheckCircle className="inline w-4 h-4 mr-1" />
                         Resolved on {new Date(complaint.ResolutionDate).toLocaleDateString()}
                       </div>
                     )}
@@ -474,9 +474,9 @@ const TeacherFeedbackPanel = () => {
 
       {/* Response Modal */}
       {showResponseModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
-            <div className="flex justify-between items-center mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-2xl p-6 mx-4 bg-white rounded-lg">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">
                 Respond to {activeTab === 'feedback' ? 'Feedback' : 'Complaint'}
               </h3>
@@ -488,8 +488,8 @@ const TeacherFeedbackPanel = () => {
               </button>
             </div>
             
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-2">
+            <div className="p-4 mb-4 rounded-lg bg-gray-50">
+              <p className="mb-2 text-sm text-gray-600">
                 {activeTab === 'feedback' ? 'Original Feedback:' : 'Original Complaint:'}
               </p>
               <p className="text-gray-800">
@@ -502,7 +502,7 @@ const TeacherFeedbackPanel = () => {
               onChange={(e) => setResponseText(e.target.value)}
               placeholder="Enter your response..."
               rows="4"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              className="w-full px-3 py-2 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             
             <div className="flex justify-end space-x-3">
@@ -517,7 +517,7 @@ const TeacherFeedbackPanel = () => {
                   activeTab, 
                   activeTab === 'feedback' ? selectedFeedback?.FeedbackID : selectedComplaint?.ComplaintID
                 )}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                className="px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600"
                 disabled={!responseText.trim()}
               >
                 Send Response

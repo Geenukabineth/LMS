@@ -590,14 +590,7 @@ const ReceptionistPanel = () => {
                             >
                               Add Payment
                             </button>
-                            <button
-                              onClick={() => handleSelectStudentForEnrollment(student)}
-                              className="px-3 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
-                              title="Manage enrollments"
-                            >
-                              <BookMarked className="inline w-3 h-3 mr-1" />
-                              Manage
-                            </button>
+                            
                           </td>
                         </tr>
                       );

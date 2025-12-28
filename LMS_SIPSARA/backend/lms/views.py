@@ -1,3 +1,4 @@
+from unittest import result
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -20,6 +21,8 @@ from .serializers import (
 )
 from .models import User, Student, Teacher, Receptionist, Profile
 from django.contrib.auth import authenticate
+from django.db.models import Count
+from django.db.models.functions import TruncMonth
 
 
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -34,6 +37,11 @@ from datetime import timedelta
 from django.utils.crypto import get_random_string
 from course.models import Course
 from course.serializers import CourseSerializer
+
+
+def generate_dummy_password():
+    """Generate a random temporary password"""
+    return get_random_string(length=12, allowed_chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%')
 
 
 class RegisterView(APIView):
@@ -258,6 +266,17 @@ class TeacherRegisterView(APIView):
                     fail_silently=False,
                 )
 
+            if result.get("temporary_password"):
+                send_email(
+                    to_email=user.email,
+                    subject="Your Teacher Account Has Been Created",
+                    template_name="emails/account_created.html",
+                    context={
+                        "username": user.username,
+                        "temporary_password": result["temporary_password"],
+                    }
+                )
+
             return Response(
                 {"success": True, "user_id": user.id},
                 status=status.HTTP_201_CREATED
@@ -286,6 +305,7 @@ class TeacherRegisterView(APIView):
             [teacher.user for teacher in teachers],
             many=True
         )
+        
 
         return Response(
             {
@@ -581,16 +601,61 @@ class ReceptionRegisterlistView(APIView):
     permission_classes = (AllowAny,)
 
     def post(self, request):
-        serializer = ReceptionistSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Receptionist registered successfully",
-                "data": serializer.data
-            }, status=status.HTTP_201_CREATED)
-        
-        # ALWAYS return a response for the failure case
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        validated_data = request.data
+        receptionist_data = validated_data.pop('receptionist')
+        email = validated_data.pop("email")
+        password = validated_data.pop("password", None)
+
+        username = validated_data.get("username")
+        if not username:
+            base = email.split("@")[0]
+            username = base
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base}{counter}"
+                counter += 1
+
+        # ✅ Generate temp password only once
+        is_temporary_password = False
+        if not password:
+            password = generate_dummy_password()
+            is_temporary_password = True
+
+        # ✅ Create user ONCE
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            user_type=User.RECEPTIONIST,
+            phone=receptionist_data.get("Phone_Number", ""),
+            is_temporary_password=is_temporary_password
+        )
+
+        # ✅ Create receptionist profile ONCE
+        Receptionist.objects.create(
+            user=user,
+            First_Name=receptionist_data.get('First_Name'),
+            Last_Name=receptionist_data.get('Last_Name'),
+            Email_Address=email,
+            Phone_Number=receptionist_data.get('Phone_Number', ""),
+            gender=receptionist_data.get('gender', ""),
+        )
+
+        # ✅ Send email only if password is temporary
+        if is_temporary_password:
+            from .utils.email import send_email
+            send_email(
+                to_email=email,
+                subject="Your Receptionist Account Has Been Created",
+                template_name="emails/account_created.html",
+                context={
+                    "username": user.username,
+                    "temporary_password": password,
+                }
+            )
+
+        return user
+
     
     def get(self, request):
         resptionists = User.objects.filter(user_type=User.RECEPTIONIST)
@@ -655,29 +720,47 @@ class ReceptionRegisterlistView(APIView):
             )
 
     
-class WebsiteTrafficAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+class UserActivityStatsAPI(APIView):
+    permission_classes = [permissions.IsAdminUser]
 
     def get(self, request):
-        user_types = ['STUDENT', 'TEACHER', 'RECEPTIONIST', 'STAFF']  # adjust as needed
-        data = []
+        # 1. Query: Group by Month and User Type, Exclude Admin
+        activity_data = (
+            User.objects
+            .exclude(user_type='admin')  # ❌ Exclude admins per your request
+            .annotate(month_date=TruncMonth('date_joined'))
+            .values('month_date', 'user_type')
+            .annotate(count=Count('id'))
+            .order_by('month_date')
+        )
 
-        for month in range(1, 13):
-            month_data = {'month': f"{month:02d}"}
-
-            # Count students, teachers, staff for this month (optional: filter by created_at)
-            month_data['students'] = User.objects.filter(user_type='STUDENT', date_joined__month=month).count()
-            month_data['teachers'] = User.objects.filter(user_type='TEACHER', date_joined__month=month).count()
-            month_data['staff'] = User.objects.filter(user_type='RECEPTIONIST', date_joined__month=month).count()  # or STAFF
-            month_data['total'] = month_data['students'] + month_data['teachers'] + month_data['staff']
-
-            data.append(month_data)
-
-        # Map month numbers to names
-        month_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-        for i, d in enumerate(data):
-            d['month'] = month_names[i]
-
-        return Response(data)
-
+        # 2. Process Data: Format for Recharts (Pivot the data)
+        # Target format: [{ "month": "Jan", "student": 10, "instructor": 5, "receptionist": 2 }, ...]
         
+        processed_data = {}
+        
+        for entry in activity_data:
+            # Format month as "Jan", "Feb", etc.
+            month_str = entry['month_date'].strftime('%b') 
+            user_type = entry['user_type'] # student, instructor, receptionist
+            count = entry['count']
+
+            if month_str not in processed_data:
+                # Initialize object with 0s for all non-admin types
+                processed_data[month_str] = {
+                    "month": month_str, 
+                    "student": 0, 
+                    "instructor": 0, 
+                    "receptionist": 0
+                }
+            
+            # Update the specific user type count
+            if user_type in processed_data[month_str]:
+                 processed_data[month_str][user_type] = count
+
+        # Convert dictionary values to a list
+        return Response({
+            "activities": list(processed_data.values())
+        })
+    
+

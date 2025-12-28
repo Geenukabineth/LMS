@@ -264,37 +264,22 @@ class ChatViewSet(viewsets.ModelViewSet):
         return context
     
     def create(self, request, *args, **kwargs):
-        """Create or get a direct chat with another user"""
         to_user_id = request.data.get('to_user_id')
-        
-        if not to_user_id:
-            return Response(
-                {'error': 'to_user_id is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         to_user = get_object_or_404(User, id=to_user_id)
         
-        # Check if chat already exists
+        # 1. Check if chat exists (Order agnostic)
         chat = Chat.objects.filter(participants=request.user).filter(participants=to_user).first()
         
         if chat:
-            serializer = self.get_serializer(chat, context=self.get_serializer_context())
+            serializer = self.get_serializer(chat)
             return Response(serializer.data)
         
-        # Create new chat
+        # 2. Only create if NO chat exists
         chat = Chat.objects.create()
         chat.participants.add(request.user, to_user)
         
-        serializer = self.get_serializer(chat, context=self.get_serializer_context())
+        serializer = self.get_serializer(chat)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-    @action(detail=True, methods=['get'])
-    def unread_count(self, request, pk=None):
-        """Get unread message count for this chat"""
-        chat = self.get_object()
-        unread_count = chat.messages.filter(is_read=False).exclude(sender=request.user).count()
-        return Response({'unread_count': unread_count})
 
 
 class DirectMessageViewSet(viewsets.ModelViewSet):
@@ -304,19 +289,29 @@ class DirectMessageViewSet(viewsets.ModelViewSet):
     pagination_class = StandardPagination
     
     def get_queryset(self):
-        """Get messages from current user's chats"""
-        chat_id = self.request.query_params.get('chat_id')
-        if chat_id:
-            # Verify user is in this chat
-            if not Chat.objects.filter(id=chat_id, participants=self.request.user).exists():
-                return DirectMessage.objects.none()
-            return DirectMessage.objects.select_related(
-                'sender__profile'
-            ).filter(chat_id=chat_id).order_by('-timestamp')
-        return DirectMessage.objects.none()
+        """Get messages: 
+           - For LIST: Requires chat_id param
+           - For DETAIL/ACTIONS: Returns any message belonging to a chat the user is in
+        """
+        user = self.request.user
+        
+        # 1. Base security: User can only see messages from chats they are in
+        queryset = DirectMessage.objects.filter(
+            chat__participants=user
+        ).select_related('sender__profile')
+
+        # 2. If listing messages, STRICTLY require chat_id
+        if self.action == 'list':
+            chat_id = self.request.query_params.get('chat_id')
+            if chat_id:
+                return queryset.filter(chat_id=chat_id).order_by('-timestamp')
+            return DirectMessage.objects.none()
+
+        # 3. For actions like 'mark_as_read', return the filtered queryset
+        return queryset
     
     def get_serializer_context(self):
-        """Add request to serializer context"""
+        # ... (keep existing code)
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
@@ -674,6 +669,8 @@ class BlockedUserViewSet(viewsets.ModelViewSet):
         return Response({'success': 'User unblocked'}, status=status.HTTP_204_NO_CONTENT)
 
 
+# chat/views.py
+
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for managing notifications"""
     serializer_class = NotificationSerializer
@@ -692,6 +689,14 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+
+    # 👇 ADD THIS NEW METHOD 👇
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get count of unread notifications"""
+        count = self.get_queryset().filter(is_read=False).count()
+        return Response({'unread_count': count})
+    # 👆 END OF NEW METHOD 👆
     
     @action(detail=True, methods=['post'])
     def mark_as_read(self, request, pk=None):
@@ -753,3 +758,35 @@ class UserOnlineStatusViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = UserSerializer(online_friends, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
+    
+from .serializers import UserMinimalSerializer
+# chat/views.py
+
+# chat/views.py
+
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet to list ALL users (Students, Teachers, Admins, Staff) from lms_user table.
+    """
+    serializer_class = UserMinimalSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
+
+    def get_queryset(self):
+        # 1. Fetch ALL active users from the main table (excluding yourself)
+        # This includes Admins, Superusers, Teachers, Students, etc.
+        queryset = User.objects.filter(is_active=True).exclude(id=self.request.user.id).order_by('-date_joined')
+        
+        # 2. Search functionality
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                Q(username__icontains=search) |
+                Q(email__icontains=search) |
+                Q(profile__full_name__icontains=search) |
+                Q(student__firstName__icontains=search) |
+                Q(teacher__First_Name__icontains=search) |
+                Q(receptionist__First_Name__icontains=search) # Added Receptionist search
+            ).distinct()
+            
+        return queryset

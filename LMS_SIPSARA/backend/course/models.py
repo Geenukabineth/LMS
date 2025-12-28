@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.text import slugify
 from django.utils import timezone
 from shortuuid.django_fields import ShortUUIDField
-from lms.models import User, Profile, Teacher,Student
+from lms.models import User, Profile, Teacher, Student
 from payment.models import CartOrderItem
 from datetime import timedelta
 
@@ -15,15 +15,15 @@ LANGUAGE = (
 
 LEVEL = (
     ('Grade 1', 'Grade 1'),
-    ('Grade 2', 'Grade 2'), 
-    ('Grade 3', 'Grade 3'), 
-    ('Grade 4', 'Grade 4'), 
-    ('Grade 5', 'Grade 5'), 
-    ('Grade 6', 'Grade 6'), 
-    ('Grade 7', 'Grade 7'), 
-    ('Grade 8', 'Grade 8'), 
-    ('Grade 9', 'Grade 9'), 
-    ('Grade 10', 'Grade 10'), 
+    ('Grade 2', 'Grade 2'),
+    ('Grade 3', 'Grade 3'),
+    ('Grade 4', 'Grade 4'),
+    ('Grade 5', 'Grade 5'),
+    ('Grade 6', 'Grade 6'),
+    ('Grade 7', 'Grade 7'),
+    ('Grade 8', 'Grade 8'),
+    ('Grade 9', 'Grade 9'),
+    ('Grade 10', 'Grade 10'),
     ('Grade 11', 'Grade 11'),
     ('Grade 12', 'Grade 12'),
     ('Grade 13', 'Grade 13'),
@@ -73,16 +73,16 @@ class Course(models.Model):
 
     language = models.CharField(choices=LANGUAGE, default="English", max_length=100, blank=True, null=True)
     level = models.CharField(choices=LEVEL, default="Grade 1", max_length=100, blank=True, null=True)
-    platform_status = models.CharField(choices=PLATFORM_STATUS, default="Published", max_length=100, blank=True, null=True)
+    platform_status = models.CharField(choices=PLATFORM_STATUS, default="published", max_length=100, blank=True, null=True)
     teacher_course_status = models.CharField(choices=TEACHER_STATUS, default="Published", max_length=100)
-    
+
     assignment_status = models.CharField(
         choices=COURSE_ASSIGNMENT_STATUS,
         default="pending",
         max_length=20,
         help_text="Status of teacher assignment"
     )
-    
+
     featured = models.BooleanField(default=False)
     course_id = ShortUUIDField(unique=True, length=6, max_length=20, alphabet="1234567890")
     slug = models.SlugField(unique=True, null=True, blank=True)
@@ -97,31 +97,32 @@ class Course(models.Model):
 
     def __str__(self):
         return self.title or "Untitled Course"
-    
+
     def save(self, *args, **kwargs):
-        if self.slug == "" or self.slug == None:
-            self.slug = slugify(self.title) if self.title else f"course-{self.course_id}"
-        super(Course, self).save(*args, **kwargs)
+        if not self.slug:
+            base = self.title if self.title else f"course-{self.course_id}"
+            self.slug = slugify(base)
+        super().save(*args, **kwargs)
 
     def students(self):
         return EnrolledCourse.objects.filter(course=self).count()
-    
+
     def curriculum(self):
         return Variant.objects.filter(course=self)
-    
+
     def lectures(self):
         return VariantItem.objects.filter(variant__course=self)
-    
+
     def average_rating(self):
-        average_rating = Review.objects.filter(course=self, active=True).aggregate(avg_rating=models.Avg('rating'))
-        return average_rating['avg_rating']
-    
+        avg = Review.objects.filter(course=self, active=True).aggregate(avg_rating=models.Avg('rating'))
+        return avg['avg_rating']
+
     def rating_count(self):
         return Review.objects.filter(course=self, active=True).count()
-    
+
     def reviews(self):
         return Review.objects.filter(course=self, active=True)
-    
+
 
 class Variant(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
@@ -136,10 +137,10 @@ class Variant(models.Model):
 
     def __str__(self):
         return self.title
-    
+
     def variant_items(self):
         return VariantItem.objects.filter(variant=self)
-    
+
     def items(self):
         return VariantItem.objects.filter(variant=self)
 
@@ -166,7 +167,7 @@ class Lesson(models.Model):
     title = models.CharField(max_length=255)
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPE)
     order = models.IntegerField(default=0, help_text="The sequence number for the lesson within the module.")
-    content_url_or_text = models.TextField(help_text="File URL or long text content (e.g., quiz instructions, assignment brief).")
+    content_url_or_text = models.TextField(help_text="File URL or long text content.")
     duration_minutes = models.IntegerField(null=True, blank=True, help_text="Estimated time for quiz/video duration.")
     lesson_id = ShortUUIDField(unique=True, length=8, max_length=20, alphabet="1234567890")
     date = models.DateTimeField(default=timezone.now)
@@ -195,7 +196,7 @@ class CompletedLesson(models.Model):
 
     def __str__(self):
         return f"{self.user.username} completed {self.lesson.title}"
-    
+
 
 class VariantItem(models.Model):
     variant = models.ForeignKey(Variant, on_delete=models.CASCADE, related_name="variant_items")
@@ -231,14 +232,15 @@ class Question_Answer(models.Model):
         verbose_name_plural = 'Questions & Answers'
 
     def __str__(self):
-        return f"{self.user.username} - {self.course.title}"
+        uname = self.user.username if self.user else "Unknown"
+        return f"{uname} - {self.course.title}"
 
     def messages(self):
         return Question_Answer_Message.objects.filter(question=self)
-    
+
     def profile(self):
         return Profile.objects.get(user=self.user)
-    
+
 
 class Question_Answer_Message(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
@@ -246,7 +248,6 @@ class Question_Answer_Message(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     message = models.TextField(null=True, blank=True)
     qam_id = ShortUUIDField(unique=True, length=6, max_length=20, alphabet="1234567890")
-    qa_id = ShortUUIDField(unique=True, length=6, max_length=20, alphabet="1234567890")
     date = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -256,10 +257,40 @@ class Question_Answer_Message(models.Model):
         verbose_name_plural = 'Q&A Messages'
 
     def __str__(self):
-        return f"{self.user.username} - {self.course.title}"
+        uname = self.user.username if self.user else "Unknown"
+        return f"{uname} - {self.course.title}"
 
     def profile(self):
         return Profile.objects.get(user=self.user)
+    
+class Quiz(models.Model):
+    lesson = models.OneToOneField("Lesson", on_delete=models.CASCADE, related_name="quiz")
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    time_limit = models.IntegerField(null=True, blank=True)
+    attempts = models.IntegerField(default=1)
+    shuffle_questions = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "course"
+
+    def __str__(self):
+        return self.title
+    
+
+class QuizQuestion(models.Model):
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="questions")
+    type = models.CharField(max_length=50)  # multiple_choice, true_false, etc.
+    question = models.TextField()
+    points = models.IntegerField(default=1)
+    options = models.JSONField(default=list, blank=True)  # for MCQ
+    correct_answer = models.CharField(max_length=255, blank=True, default="")
+    explanation = models.TextField(blank=True, default="")
+
+    class Meta:
+        app_label = "course"
+
 
 
 class Certificate(models.Model):
@@ -275,15 +306,9 @@ class Certificate(models.Model):
 
     def __str__(self):
         return self.course.title
-    
+
 
 class EnrolledCourse(models.Model):
-    """
-    ✅ UPDATED: Automatic 30-day enrollment expiration
-    - Automatically sets ended_at to current date + 30 days on creation
-    - has_access() method checks if enrollment is still active
-    - is_expired property for quick expiration check
-    """
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     user = models.ForeignKey(Student, on_delete=models.SET_NULL, null=True, blank=True)
     teacher = models.ForeignKey(Teacher, on_delete=models.SET_NULL, null=True, blank=True)
@@ -292,7 +317,7 @@ class EnrolledCourse(models.Model):
     date = models.DateTimeField(default=timezone.now)
     ended_at = models.DateTimeField(null=True, blank=True, help_text="Enrollment expiration date (auto-set to 30 days from start)")
     status = models.CharField(
-        max_length=20, 
+        max_length=20,
         default='active',
         choices=[('active', 'Active'), ('expired', 'Expired')],
         help_text="Enrollment status"
@@ -308,61 +333,64 @@ class EnrolledCourse(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.user.username} - {self.course.title}"
-    
+        if not self.user or not getattr(self.user, "user", None):
+            return f"Unknown - {self.course.title}"
+        return f"{self.user.user.username} - {self.course.title}"
+
     def save(self, *args, **kwargs):
-        """
-        ✅ Auto-set ended_at to 30 days from enrollment date on creation
-        """
         if not self.ended_at:
-            # Set enrollment to expire 30 days from start date
             self.ended_at = self.date + timedelta(days=30)
-        
-        # Auto-update status based on expiration
+
         if self.ended_at and timezone.now() > self.ended_at:
             self.status = 'expired'
         else:
             self.status = 'active'
-        
+
         super().save(*args, **kwargs)
-    
+
     @property
     def is_expired(self):
-        """✅ Quick check: Is enrollment expired?"""
         if self.ended_at is None:
             return False
         return timezone.now() > self.ended_at
-    
+
     @property
     def days_remaining(self):
-        """✅ Calculate days remaining until expiration"""
         if self.ended_at is None:
             return None
         remaining = (self.ended_at - timezone.now()).days
         return max(0, remaining)
-    
+
     def has_access(self):
-        """✅ Check if student still has access to course"""
         return not self.is_expired and self.status == 'active'
-    
+
     def lectures(self):
         return VariantItem.objects.filter(variant__course=self.course)
-    
+
     def completed_lesson(self):
-        return CompletedLesson.objects.filter(lesson__module__course=self.course, user=self.user)
-    
+        """
+        ✅ FIXED: CompletedLesson.user is a User, but EnrolledCourse.user is Student
+        """
+        if not self.user or not getattr(self.user, "user", None):
+            return CompletedLesson.objects.none()
+        return CompletedLesson.objects.filter(lesson__module__course=self.course, user=self.user.user)
+
     def curriculum(self):
         return Variant.objects.filter(course=self.course)
-    
+
     def note(self):
-        return Note.objects.filter(course=self.course, user=self.user)
-    
+        if not self.user or not getattr(self.user, "user", None):
+            return Note.objects.none()
+        return Note.objects.filter(course=self.course, user=self.user.user)
+
     def question_answer(self):
         return Question_Answer.objects.filter(course=self.course)
-    
+
     def review(self):
-        return Review.objects.filter(course=self.course, user=self.user).first()
-    
+        if not self.user or not getattr(self.user, "user", None):
+            return None
+        return Review.objects.filter(course=self.course, user=self.user.user).first()
+
 
 class Note(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
@@ -379,13 +407,13 @@ class Note(models.Model):
 
     def __str__(self):
         return self.title or "Untitled Note"
-    
+
 
 class Review(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     review = models.TextField()
-    rating = models.IntegerField(choices=RATING, default=None)
+    rating = models.IntegerField(choices=RATING, default=1)
     reply = models.CharField(null=True, blank=True, max_length=1000)
     active = models.BooleanField(default=False)
     date = models.DateTimeField(default=timezone.now)
@@ -397,26 +425,66 @@ class Review(models.Model):
 
     def __str__(self):
         return self.course.title
-    
+
     def profile(self):
         return Profile.objects.get(user=self.user)
 
 
 class Assignment(models.Model):
+    lesson = models.OneToOneField("Lesson", on_delete=models.CASCADE, related_name="assignment")
     title = models.CharField(max_length=255)
-    due_date = models.DateTimeField()
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    description = models.TextField()
+    due_date = models.DateTimeField(null=True, blank=True)
+    description = models.TextField(blank=True, default="")
     file = models.FileField(upload_to='assignments/', null=True, blank=True)
-    submitted_at = models.DateTimeField(auto_now_add=True)
-    grade = models.CharField(max_length=10, null=True, blank=True)
-    feedback = models.TextField(null=True, blank=True)
+    points = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        app_label = 'course'
-        verbose_name = 'Assignment'
-        verbose_name_plural = 'Assignments'
+        app_label = "course"
 
     def __str__(self):
         return self.title
+
+
+class LiveSession(models.Model):
+    course = models.ForeignKey('course.Course', on_delete=models.CASCADE, related_name='live_sessions')
+    title = models.CharField(max_length=200)
+    
+    # Scheduling fields (Missing in your current error)
+    date = models.DateField()
+    time = models.TimeField()
+    duration = models.IntegerField(default=60, help_text="Duration in minutes")
+    
+    # Zoom Integration fields
+    meeting_id = models.CharField(max_length=50, blank=True, null=True, help_text="Zoom Meeting ID")
+    meeting_password = models.CharField(max_length=50, blank=True, null=True)
+    join_url = models.URLField(max_length=1000, blank=True, null=True, help_text="Link for students")
+    start_url = models.URLField(max_length=1000, blank=True, null=True, help_text="Link for teacher (host)")
+    
+    # Status fields
+    is_completed = models.BooleanField(default=False)
+    attendance_synced = models.BooleanField(default=False) 
+
+    def __str__(self):
+        return f"{self.course.title} - {self.title}"
+
+class LiveAttendance(models.Model):
+    session = models.ForeignKey(LiveSession, on_delete=models.CASCADE, related_name='attendance_records')
+    student = models.ForeignKey('lms.Student', on_delete=models.CASCADE, related_name='live_attendance')
+    
+    # Zoom API data
+    join_time = models.DateTimeField(null=True, blank=True)
+    leave_time = models.DateTimeField(null=True, blank=True)
+    duration_minutes = models.IntegerField(default=0)
+    
+    status = models.CharField(
+        max_length=20, 
+        choices=[('present', 'Present'), ('absent', 'Absent'), ('late', 'Late')],
+        default='absent'
+    )
+
+    class Meta:
+        unique_together = ('session', 'student')
+
+    def __str__(self):
+        return f"{self.student.user.username} - {self.session.title}"

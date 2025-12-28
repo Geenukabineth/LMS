@@ -1,12 +1,13 @@
 import React from 'react';
 import { Users } from 'lucide-react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+import notificationConfig from "@/config/notification.config";
+
 
 const GroupsList = ({ groups, selectedChat, onSelectChat, onNotification }) => {
   const handleSelectGroup = async (group) => {
     try {
       // Fetch group details
-      const groupDetail = await apiCall(API_ENDPOINTS.GROUP_DETAIL(group.id));
+      const groupDetail = await notificationConfig.GROUP_DETAIL(group.id);
       onSelectChat?.(groupDetail || group);
     } catch (error) {
       console.error('Error loading group:', error);

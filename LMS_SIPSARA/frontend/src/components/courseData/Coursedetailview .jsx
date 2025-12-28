@@ -27,7 +27,7 @@ import {
 
 const API_BASE_URL = 'http://localhost:8000/Course';
 
-console.log(`📡 API Base URL: ${API_BASE_URL}`);
+
 
 const courseApiService = {
   getAuthHeaders() {

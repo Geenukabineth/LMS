@@ -1,527 +1,847 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, X, Video, FileText, Save, Trash2, GripVertical, Upload, Link as LinkIcon, ArrowLeft } from 'lucide-react';
-import { API_COURSE_ENDPOINTS } from '@/config/courseapi';
-import authService from '@/context/authService';
+// AddWeeklyContent.jsx (FULL - FIXED)
+// ✅ Lessons now SAVE to backend
+// ✅ Document upload supported (multipart/form-data)
+// ✅ Works with your DRF LessonCreateAPIView which uses MultiPartParser/FormParser
+// ✅ NO Redux
 
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Plus,
+  Save,
+  Trash2,
+  ArrowLeft,
+  Video,
+  FileText,
+  AlertCircle,
+  ChevronDown,
+  Upload,
+  Link as LinkIcon,
+} from "lucide-react";
+import { courseService } from "@/config/course.config";
+
+const lessonTypeMeta = {
+  video: {
+    label: "Video",
+    icon: Video,
+    badge: "bg-red-50 text-red-700 border-red-200",
+  },
+  document: {
+    label: "Document",
+    icon: FileText,
+    badge: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+};
+
+const StatCard = ({ title, value, icon: Icon }) => (
+  <div className="p-4 bg-white border shadow-sm rounded-2xl">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm text-gray-500">{title}</p>
+        <p className="text-2xl font-bold text-gray-900">{value}</p>
+      </div>
+      <div className="p-3 text-gray-700 rounded-xl bg-gray-50">
+        <Icon size={20} />
+      </div>
+    </div>
+  </div>
+);
+
+const Pill = ({ children, className = "" }) => (
+  <span
+    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border ${className}`}
+  >
+    {children}
+  </span>
+);
+
+const ToggleChip = ({ active, icon: Icon, label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition ${
+      active
+        ? "bg-gray-900 text-white border-gray-900"
+        : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+    }`}
+  >
+    <Icon size={16} />
+    {label}
+  </button>
+);
 
 const AddWeeklyContent = ({ courseId, onBack }) => {
   const [modules, setModules] = useState([
-    {
-      id: 1,
-      title: '',
-      order: 1,
-      lessons: []
-    }
+    { id: `tmp-${Date.now()}`, title: "", order: 1, lessons: [], _isNew: true },
   ]);
 
-  const [loading, setLoading] = useState(false);
   const [courseDetails, setCourseDetails] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  // Fetch course details on mount
+  const [expanded, setExpanded] = useState({});
+  const [weekFilter, setWeekFilter] = useState("all");
+  const [nextWeekHint, setNextWeekHint] = useState(1);
+
   useEffect(() => {
-    if (courseId) {
-      fetchCourseDetails();
-    }
+    if (courseId) fetchCourseDetails();
+    // eslint-disable-next-line
   }, [courseId]);
 
   const fetchCourseDetails = async () => {
-    if (!courseId) return; //
     try {
-      const response = await authService.api.get(`/Course/courses/teacher/${courseId}/`);
-        
-        setCourseDetails(res.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
+      const data = await courseService.getCourseModules(courseId);
+      setCourseDetails(data?.course || null);
 
-  // Add new module (week)
+      if (Array.isArray(data?.modules) && data.modules.length > 0) {
+        const formatted = data.modules.map((m, index) => ({
+          id: m.id, // numeric
+          title: m.title || "",
+          order: m.order ?? index + 1,
+          lessons: Array.isArray(m.lessons)
+            ? m.lessons.map((l, i) => ({
+                id: l.id, // numeric
+                title: l.title || "",
+                content_type: l.content_type || "document",
+                order: l.order ?? i + 1,
+                content_url_or_text: l.content_url_or_text || "",
+                duration_minutes: l.duration_minutes ?? "",
+                // UI-only week (backend model doesn't have it)
+                week: 1,
+                uploadType: "url", // "url" | "file"
+                file: null,
+                _isNew: false,
+              }))
+            : [],
+          _isNew: false,
+        }));
+
+        setModules(formatted);
+
+        const firstId = formatted?.[0]?.id;
+        if (firstId) setExpanded({ [firstId]: true });
+      } else {
+        const tmpId = `tmp-${Date.now()}`;
+        setModules([
+          { id: tmpId, title: "", order: 1, lessons: [], _isNew: true },
+        ]);
+        setExpanded({ [tmpId]: true });
+      }
+    } catch (err) {
+      console.error(err);
+      setCourseDetails(null);
+      setModules([
+        { id: `tmp-${Date.now()}`, title: "", order: 1, lessons: [], _isNew: true },
+      ]);
+    }
+  };
+
+  const totalModules = modules.length;
+  const totalLessons = useMemo(
+    () => modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0),
+    [modules]
+  );
+
+  const maxWeek = useMemo(() => {
+    let max = 1;
+    modules.forEach((m) => {
+      (m.lessons || []).forEach((l) => {
+        if (Number.isFinite(l.week)) max = Math.max(max, l.week);
+      });
+    });
+    return max;
+  }, [modules]);
+
+  useEffect(() => setNextWeekHint(maxWeek + 1), [maxWeek]);
+
   const addModule = () => {
-    const newModule = {
-      id: Date.now(),
-      title: '',
-      order: modules.length + 1,
-      lessons: []
-    };
-    setModules([...modules, newModule]);
+    const id = `tmp-${Date.now()}`;
+    setModules((prev) => [
+      ...prev,
+      { id, title: "", order: prev.length + 1, lessons: [], _isNew: true },
+    ]);
+    setExpanded((prev) => ({ ...prev, [id]: true }));
   };
 
-  // Remove module
-  const removeModule = (moduleId) => {
-    if (modules.length > 1) {
-      setModules(modules.filter(m => m.id !== moduleId));
-    }
+  const updateModuleTitle = (id, title) => {
+    setModules((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, title } : m))
+    );
   };
 
-  // Update module title
-  const updateModuleTitle = (moduleId, title) => {
-    setModules(modules.map(m => 
-      m.id === moduleId ? { ...m, title } : m
-    ));
+  const toggleExpand = (moduleId) => {
+    setExpanded((prev) => ({ ...prev, [moduleId]: !prev[moduleId] }));
   };
 
-  // Add lesson to module
-  const addLesson = (moduleId, contentType) => {
-    setModules(modules.map(m => {
-      if (m.id === moduleId) {
-        const newLesson = {
-          id: Date.now(),
-          title: '',
-          content_type: contentType,
-          order: m.lessons.length + 1,
-          content_url_or_text: '',
-          duration_minutes: '',
-          file: null,
-          uploadType: 'url' // 'url' or 'file'
-        };
-        return { ...m, lessons: [...m.lessons, newLesson] };
-      }
-      return m;
-    }));
-  };
+  const removeModule = async (id) => {
+    setErrorMessage("");
+    setSuccessMessage("");
 
-  // Remove lesson
-  const removeLesson = (moduleId, lessonId) => {
-    setModules(modules.map(m => {
-      if (m.id === moduleId) {
-        return { ...m, lessons: m.lessons.filter(l => l.id !== lessonId) };
-      }
-      return m;
-    }));
-  };
+    const module = modules.find((m) => m.id === id);
+    if (!module) return;
 
-  // Update lesson
-  const updateLesson = (moduleId, lessonId, field, value) => {
-    setModules(modules.map(m => {
-      if (m.id === moduleId) {
-        return {
-          ...m,
-          lessons: m.lessons.map(l => 
-            l.id === lessonId ? { ...l, [field]: value } : l
-          )
-        };
-      }
-      return m;
-    }));
-  };
-
-  // Handle file upload for lesson
-  const handleFileUpload = (moduleId, lessonId, file) => {
-    setModules(modules.map(m => {
-      if (m.id === moduleId) {
-        return {
-          ...m,
-          lessons: m.lessons.map(l => 
-            l.id === lessonId ? { ...l, file: file } : l
-          )
-        };
-      }
-      return m;
-    }));
-  };
-
-  // Validate form
-  const validateForm = () => {
-    for (const module of modules) {
-      if (!module.title.trim()) {
-        setErrorMessage('All modules must have a title');
-        return false;
-      }
-      if (module.lessons.length === 0) {
-        setErrorMessage('Each module must have at least one lesson');
-        return false;
-      }
-      for (const lesson of module.lessons) {
-        if (!lesson.title.trim()) {
-          setErrorMessage('All lessons must have a title');
-          return false;
-        }
-        if (!lesson.content_url_or_text && !lesson.file) {
-          setErrorMessage('Each lesson must have content (URL or file)');
-          return false;
-        }
-      }
-    }
-    return true;
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Clear previous messages
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    // Validate form
-    if (!validateForm()) {
+    if (modules.length === 1) {
+      setErrorMessage("You must have at least one module.");
       return;
     }
 
-    setLoading(true);
-
     try {
-      // Process each module
-      for (const module of modules) {
-        // Create module first
-        const moduleData = {
-          course: courseId,
-          title: module.title,
-          order: module.order
-        };
-
-        const moduleResponse = await fetch(API_COURSE_ENDPOINTS.CREATE_MODULE, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(moduleData)
-        });
-
-        if (!moduleResponse.ok) {
-          throw new Error('Failed to create module');
-        }
-
-        const createdModule = await moduleResponse.json();
-
-        // Create lessons for this module
-        for (const lesson of module.lessons) {
-          const formData = new FormData();
-          formData.append('module', createdModule.module_id || createdModule.id);
-          formData.append('title', lesson.title);
-          formData.append('content_type', lesson.content_type);
-          formData.append('order', lesson.order);
-          
-          if (lesson.duration_minutes) {
-            formData.append('duration_minutes', lesson.duration_minutes);
-          }
-
-          // Handle file upload or URL
-          if (lesson.uploadType === 'file' && lesson.file) {
-            // Upload file first
-            const fileFormData = new FormData();
-            fileFormData.append('file', lesson.file);
-
-            const fileResponse = await fetch('/Course/path/upload/', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              },
-              body: fileFormData
-            });
-
-            if (fileResponse.ok) {
-              const fileData = await fileResponse.json();
-              formData.append('content_url_or_text', fileData.file_url || fileData.url);
-            } else {
-              throw new Error('Failed to upload file');
-            }
-          } else if (lesson.uploadType === 'url') {
-            formData.append('content_url_or_text', lesson.content_url_or_text);
-          }
-
-          // Create lesson
-          const lessonResponse = await fetch('/Course/lessons/create/', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: formData
-          });
-
-          if (!lessonResponse.ok) {
-            throw new Error('Failed to create lesson');
-          }
-        }
+      if (!module._isNew && typeof module.id === "number") {
+        setLoading(true);
+        await courseService.deleteCourseModules(module.id);
       }
 
-      setSuccessMessage('✓ Course content saved successfully!');
-      
-      // Reset form after successful submission
-      setTimeout(() => {
-        setModules([
-          {
-            id: 1,
-            title: '',
-            order: 1,
-            lessons: []
-          }
-        ]);
-        if (onBack) {
-          onBack();
-        }
-      }, 2000);
+      setModules((prev) =>
+        prev
+          .filter((m) => m.id !== id)
+          .map((m, idx) => ({ ...m, order: idx + 1 }))
+      );
 
-    } catch (error) {
-      console.error('Error saving content:', error);
-      setErrorMessage('Failed to save content. Please try again.');
+      setExpanded((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+
+      setSuccessMessage("✓ Module deleted");
+    } catch (e) {
+      console.error(e);
+      setErrorMessage("Failed to delete module");
     } finally {
       setLoading(false);
     }
   };
 
+  // ---- Lessons ----
+  const addLesson = (moduleId, type) => {
+    setModules((prev) =>
+      prev.map((m) => {
+        if (m.id !== moduleId) return m;
+
+        const nextOrder = (m.lessons?.length || 0) + 1;
+        const moduleMaxWeek = (m.lessons || []).reduce(
+          (mx, l) => Math.max(mx, l.week || 1),
+          1
+        );
+        const weekDefault =
+          weekFilter !== "all"
+            ? Number(weekFilter)
+            : m.lessons?.length
+              ? moduleMaxWeek
+              : nextWeekHint;
+
+        return {
+          ...m,
+          lessons: [
+            ...(m.lessons || []),
+            {
+              id: `tmp-lesson-${Date.now()}`,
+              title: "",
+              content_type: type,
+              order: nextOrder,
+              content_url_or_text: "",
+              duration_minutes: "",
+              week: weekDefault, // UI-only
+              uploadType: "url", // default
+              file: null,
+              _isNew: true,
+            },
+          ],
+        };
+      })
+    );
+  };
+
+  const updateLesson = (moduleId, lessonId, field, value) => {
+    setModules((prev) =>
+      prev.map((m) => {
+        if (m.id !== moduleId) return m;
+        return {
+          ...m,
+          lessons: (m.lessons || []).map((l) =>
+            l.id === lessonId ? { ...l, [field]: value } : l
+          ),
+        };
+      })
+    );
+  };
+
+  const removeLesson = async (moduleId, lessonId) => {
+    // UI remove only
+    setModules((prev) =>
+      prev.map((m) =>
+        m.id === moduleId
+          ? { ...m, lessons: (m.lessons || []).filter((l) => l.id !== lessonId) }
+          : m
+      )
+    );
+
+    // If it's an existing lesson (numeric id), also delete on server
+    const lessonIsNumeric = Number.isInteger(Number(lessonId));
+    if (lessonIsNumeric) {
+      try {
+      await courseService.deleteCourseLessons(Number(lessonId));  
+       setSuccessMessage("✓ Lesson deleted");
+      } catch (e) {
+        console.error(e);
+        setErrorMessage("Failed to delete lesson on server");
+      }
+    }
+  };
+
+  const onLessonFilePick = (moduleId, lessonId, file) => {
+    updateLesson(moduleId, lessonId, "file", file);
+    updateLesson(moduleId, lessonId, "uploadType", "file");
+    updateLesson(moduleId, lessonId, "content_url_or_text", "");
+  };
+
+  const validate = () => {
+    for (const m of modules) {
+      if (!m.title?.trim()) return "Module title is required";
+
+      // Validate only new lessons
+      for (const l of m.lessons || []) {
+        if (!l._isNew) continue;
+
+        if (!l.title?.trim()) return "Lesson title is required";
+
+        if (l.uploadType === "file") {
+          if (!l.file) return "Please upload a document file for the lesson";
+        } else {
+          if (!l.content_url_or_text) return "Lesson URL required";
+        }
+      }
+    }
+    return null;
+  };
+
+  const buildLessonFormData = (realModuleId, lesson) => {
+    const fd = new FormData();
+    fd.append("module", String(realModuleId)); // backend expects "module"
+    fd.append("title", lesson.title || "");
+    fd.append("content_type", lesson.content_type || "document");
+    fd.append("order", String(lesson.order || 1));
+
+    if (lesson.duration_minutes !== "" && lesson.duration_minutes != null) {
+      fd.append("duration_minutes", String(lesson.duration_minutes));
+    } else {
+      fd.append("duration_minutes", "");
+    }
+
+    // If file upload
+    if (lesson.uploadType === "file" && lesson.file) {
+      fd.append("file", lesson.file);
+    } else {
+      fd.append("content_url_or_text", lesson.content_url_or_text || "");
+    }
+
+    return fd;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const err = validate();
+    if (err) return setErrorMessage(err);
+
+    setLoading(true);
+
+    try {
+      // 1) Create/update modules, map local ids -> real numeric ids
+      const moduleIdMap = new Map();
+
+      for (const module of modules) {
+        if (!module._isNew && typeof module.id === "number") {
+          await courseService.putCourseModules(module.id, {
+            module_id: module.id,
+            title: module.title,
+            order: module.order,
+          });
+          moduleIdMap.set(module.id, module.id);
+        } else {
+          const created = await courseService.postCourseModules({
+            course_id: courseId,
+            title: module.title,
+            order: module.order,
+          });
+
+          const realId =
+            created?.id ??
+            created?.module?.id ??
+            created?.data?.id ??
+            created?.data?.module?.id;
+
+          if (!realId) throw new Error("Module created but module id not returned");
+
+          moduleIdMap.set(module.id, realId);
+        }
+      }
+
+      // 2) Create new lessons (multipart/form-data)
+      for (const module of modules) {
+        const realModuleId = moduleIdMap.get(module.id);
+        if (!realModuleId) continue;
+
+        const newLessons = (module.lessons || []).filter((l) => l._isNew);
+
+        for (const lesson of newLessons) {
+          const fd = buildLessonFormData(realModuleId, lesson);
+          await courseService.postCourseLessons(fd);
+        }
+      }
+
+      setSuccessMessage("✓ Modules and lessons saved successfully");
+      await fetchCourseDetails();
+    } catch (e2) {
+      console.error(e2);
+      setErrorMessage(e2?.message || "Failed to save changes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Week filter options (UI-only)
+  const weeksOptions = useMemo(() => {
+    const set = new Set([1]);
+    modules.forEach((m) => (m.lessons || []).forEach((l) => set.add(l.week || 1)));
+    return Array.from(set).sort((a, b) => a - b);
+  }, [modules]);
+
+  const groupLessonsByWeek = (lessons = []) => {
+    const map = new Map();
+    lessons.forEach((l) => {
+      const w = Number(l.week) || 1;
+      if (weekFilter !== "all" && w !== Number(weekFilter)) return;
+      if (!map.has(w)) map.set(w, []);
+      map.get(w).push(l);
+    });
+    const entries = Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+    return entries.map(([week, items]) => ({
+      week,
+      items: items.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    }));
+  };
+
   return (
-    <div className="w-full min-h-screen p-4 bg-gradient-to-br from-blue-50 to-indigo-100 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header with Back Button */}
-        <div className="flex items-center gap-4 mb-8">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 transition-colors bg-white rounded-lg shadow-sm hover:bg-gray-100"
-            >
-              <ArrowLeft size={20} />
-              Back
-            </button>
-          )}
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Add Course Content</h1>
-            <p className="mt-2 text-gray-600">{courseDetails?.title || 'Build your course curriculum'}</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Top bar */}
+      <div className="sticky top-0 z-30 bg-white border-b">
+        <div className="flex items-center justify-between max-w-6xl gap-4 px-6 py-4 mx-auto">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 px-3 py-2 border rounded-xl hover:bg-gray-50"
+            type="button"
+          >
+            <ArrowLeft size={18} /> Back
+          </button>
+
+          <div className="items-center hidden gap-2 text-sm text-gray-500 md:flex">
+            <span>Course</span>
+            <span>›</span>
+            <span className="font-semibold text-gray-900">Content</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl px-6 py-6 mx-auto">
+        {/* Header */}
+        <div className="p-6 bg-white border shadow-sm rounded-2xl">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
+                Course Content
+              </h1>
+              <p className="mt-1 text-gray-600">
+                {courseDetails?.title ||
+                  "Build your course module-by-module and week-by-week."}
+              </p>
+
+              <div className="mt-4 space-y-2">
+                {errorMessage && (
+                  <div className="flex items-start gap-2 p-3 text-red-700 border border-red-200 rounded-xl bg-red-50">
+                    <AlertCircle size={18} className="mt-0.5" />
+                    <div className="text-sm">{errorMessage}</div>
+                  </div>
+                )}
+                {successMessage && (
+                  <div className="p-3 text-sm text-green-700 border border-green-200 rounded-xl bg-green-50">
+                    {successMessage}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Week filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Week</label>
+              <select
+                className="px-3 py-2 bg-white border rounded-xl"
+                value={weekFilter}
+                onChange={(e) => setWeekFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                {weeksOptions.map((w) => (
+                  <option key={w} value={String(w)}>
+                    Week {w}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-1 gap-4 mt-6 md:grid-cols-3">
+            <StatCard title="Modules" value={totalModules} icon={FileText} />
+            <StatCard title="Lessons" value={totalLessons} icon={Video} />
+            <StatCard
+              title="Weeks"
+              value={Math.max(maxWeek, weeksOptions.length)}
+              icon={ChevronDown}
+            />
           </div>
         </div>
 
-        {/* Success Message */}
-        {successMessage && (
-          <div className="p-4 mb-6 text-green-700 bg-green-100 border border-green-400 rounded-lg">
-            {successMessage}
-          </div>
-        )}
-
-        {/* Error Message */}
-        {errorMessage && (
-          <div className="p-4 mb-6 text-red-700 bg-red-100 border border-red-400 rounded-lg">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Main Form */}
-        <div className="overflow-hidden bg-white shadow-lg rounded-xl">
-          <form onSubmit={handleSubmit} className="p-8">
-            {/* Info Box */}
-            <div className="p-4 mb-8 border-l-4 border-blue-600 rounded-lg bg-blue-50">
-              <h3 className="mb-2 font-semibold text-blue-900">💡 Tips for great course content:</h3>
-              <ul className="space-y-1 text-sm text-blue-800">
-                <li>• Create modules for each week or topic of your course</li>
-                <li>• Add videos, documents, or assignments to each module</li>
-                <li>• Include video duration and document descriptions</li>
-                <li>• Organize content in a logical, easy-to-follow order</li>
-              </ul>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          {/* Top actions */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-gray-600">
+              Tip: Use the Week dropdown to focus lessons week-by-week.
             </div>
 
-            {/* Modules Section */}
-            <section className="mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Course Modules</h2>
-                <button
-                  type="button"
-                  onClick={addModule}
-                  className="flex items-center gap-2 px-4 py-2 text-white transition-colors bg-green-600 rounded-lg hover:bg-green-700"
+            <button
+              type="button"
+              onClick={addModule}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border rounded-xl hover:bg-gray-50"
+            >
+              <Plus size={18} /> Add Module
+            </button>
+          </div>
+
+          {/* Modules */}
+          <div className="space-y-4">
+            {modules.map((m, idx) => {
+              const isOpen = !!expanded[m.id];
+              const grouped = groupLessonsByWeek(m.lessons || []);
+
+              return (
+                <div
+                  key={m.id}
+                  className="overflow-hidden bg-white border shadow-sm rounded-2xl"
                 >
-                  <Plus size={18} />
-                  Add Module
-                </button>
-              </div>
+                  {/* Module header */}
+                  <div className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-start w-full gap-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(m.id)}
+                        className="p-2 mt-1 border rounded-xl hover:bg-gray-50"
+                        aria-label="Toggle module"
+                      >
+                        <ChevronDown
+                          size={18}
+                          className={`transition ${isOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
 
-              <div className="space-y-6">
-                {modules.map((module, moduleIndex) => (
-                  <div key={module.id} className="p-6 transition-colors border-2 border-gray-200 bg-gray-50 rounded-xl hover:border-blue-400">
-                    {/* Module Title */}
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="flex items-center justify-center text-3xl font-bold text-blue-600 bg-blue-100 rounded-lg w-14 h-14">
-                        {String(moduleIndex + 1).padStart(2, '0')}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Pill className="text-gray-700 border-gray-200 bg-gray-50">
+                            Module {idx + 1}
+                          </Pill>
+                          <Pill className="text-indigo-700 border-indigo-200 bg-indigo-50">
+                            Order {m.order}
+                          </Pill>
+                          {m._isNew ? (
+                            <Pill className="bg-amber-50 text-amber-700 border-amber-200">
+                              New
+                            </Pill>
+                          ) : (
+                            <Pill className="text-green-700 border-green-200 bg-green-50">
+                              Existing
+                            </Pill>
+                          )}
+                        </div>
+
+                        <input
+                          className="w-full px-4 py-3 bg-white border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                          placeholder={`Module ${idx + 1} title`}
+                          value={m.title}
+                          onChange={(e) => updateModuleTitle(m.id, e.target.value)}
+                        />
                       </div>
-                      <input
-                        type="text"
-                        value={module.title}
-                        onChange={(e) => updateModuleTitle(module.id, e.target.value)}
-                        placeholder={`Week ${moduleIndex + 1} - Enter module title (e.g., "Week 1: Introduction")`}
-                        required
-                        className="flex-1 px-4 py-3 text-lg font-semibold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                      
-                      {modules.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeModule(module.id)}
-                          className="p-2 text-red-600 transition rounded-lg hover:bg-red-50"
-                          title="Delete module"
-                        >
-                          <Trash2 size={22} />
-                        </button>
-                      )}
-                    </div>
 
-                    {/* Lessons in Module */}
-                    <div className="pl-6 ml-2 space-y-4 border-l-2 border-gray-300">
-                      {module.lessons.map((lesson, lessonIndex) => {
-                        const ContentIcon = lesson.content_type === 'video' ? Video : FileText;
-                        
-                        return (
-                          <div key={lesson.id} className="p-5 transition-shadow bg-white border border-gray-200 rounded-lg hover:shadow-md">
-                            <div className="flex items-start gap-4">
-                              <div className="p-2 mt-1 bg-gray-100 rounded-lg">
-                                <ContentIcon size={20} className={lesson.content_type === 'video' ? 'text-red-500' : 'text-blue-500'} />
-                              </div>
-                              
-                              <div className="flex-1 space-y-4">
-                                {/* Lesson Title and Duration */}
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                  <div className="md:col-span-2">
-                                    <input
-                                      type="text"
-                                      value={lesson.title}
-                                      onChange={(e) => updateLesson(module.id, lesson.id, 'title', e.target.value)}
-                                      placeholder={`${lesson.content_type === 'video' ? 'Video' : 'Document'} title`}
-                                      required
-                                      className="w-full px-3 py-2 font-medium border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                  </div>
-                                  
-                                  <input
-                                    type="number"
-                                    value={lesson.duration_minutes}
-                                    onChange={(e) => updateLesson(module.id, lesson.id, 'duration_minutes', e.target.value)}
-                                    placeholder="Duration (minutes)"
-                                    min="0"
-                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  />
-                                </div>
-
-                                {/* Upload Type Toggle */}
-                                <div className="flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => updateLesson(module.id, lesson.id, 'uploadType', 'url')}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-                                      lesson.uploadType === 'url'
-                                        ? 'bg-blue-600 text-white shadow-md'
-                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                    }`}
-                                  >
-                                    <LinkIcon size={16} />
-                                    URL/Link
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => updateLesson(module.id, lesson.id, 'uploadType', 'file')}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-                                      lesson.uploadType === 'file'
-                                        ? 'bg-blue-600 text-white shadow-md'
-                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                    }`}
-                                  >
-                                    <Upload size={16} />
-                                    Upload File
-                                  </button>
-                                </div>
-
-                                {/* URL Input or File Upload */}
-                                {lesson.uploadType === 'url' ? (
-                                  <div>
-                                    <label className="block mb-1 text-xs font-semibold text-gray-700">Content URL</label>
-                                    <input
-                                      type="text"
-                                      value={lesson.content_url_or_text}
-                                      onChange={(e) => updateLesson(module.id, lesson.id, 'content_url_or_text', e.target.value)}
-                                      placeholder={
-                                        lesson.content_type === 'video' 
-                                          ? 'Video URL (YouTube, Vimeo, etc.) - e.g., https://youtube.com/watch?v=...' 
-                                          : 'Document URL (PDF, Google Docs, etc.) - e.g., https://docs.google.com/...'
-                                      }
-                                      required
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="space-y-2">
-                                    <label className="block text-xs font-semibold text-gray-700">Upload File</label>
-                                    <input
-                                      type="file"
-                                      accept={lesson.content_type === 'video' ? 'video/*' : '.pdf,.doc,.docx,.txt,.ppt,.pptx'}
-                                      onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                          handleFileUpload(module.id, lesson.id, file);
-                                        }
-                                      }}
-                                      required
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                    {lesson.file && (
-                                      <div className="p-3 border border-green-200 rounded-lg bg-green-50">
-                                        <p className="text-xs font-medium text-green-700">
-                                          ✓ Selected: {lesson.file.name}
-                                        </p>
-                                        <p className="text-xs text-green-600">
-                                          Size: {(lesson.file.size / 1024 / 1024).toFixed(2)} MB
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => removeLesson(module.id, lesson.id)}
-                                className="flex-shrink-0 p-2 text-red-600 transition rounded-lg hover:bg-red-50"
-                                title="Delete lesson"
-                              >
-                                <X size={20} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {/* Add Lesson Buttons */}
-                      <div className="flex gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => addLesson(module.id, 'video')}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 transition border-2 border-red-600 rounded-lg hover:bg-red-50"
-                        >
-                          <Video size={16} />
-                          Add Video
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => addLesson(module.id, 'document')}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 transition border-2 border-blue-600 rounded-lg hover:bg-blue-50"
-                        >
-                          <FileText size={16} />
-                          Add Document
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeModule(m.id)}
+                        className="p-3 text-red-600 border rounded-xl hover:bg-red-50 disabled:opacity-50"
+                        disabled={loading}
+                        title="Delete module"
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </section>
 
-            {/* Submit Button */}
-            <div className="flex justify-end gap-4 pt-8 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={onBack}
-                className="px-6 py-3 font-semibold text-gray-700 transition border-2 border-gray-300 rounded-lg hover:bg-gray-50"
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center gap-2 px-6 py-3 font-semibold text-white transition rounded-lg shadow-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-400 disabled:to-gray-500 hover:shadow-lg"
-              >
-                <Save size={20} />
-                {loading ? 'Saving...' : 'Save Course Content'}
-              </button>
-            </div>
-          </form>
+                  {/* Module body */}
+                  {isOpen && (
+                    <div className="p-5 border-t bg-gray-50">
+                      {/* Lesson actions */}
+                      <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
+                        <div className="text-sm text-gray-600">
+                          Add lessons and assign them to a Week.
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => addLesson(m.id, "video")}
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-white border rounded-xl hover:bg-gray-50"
+                          >
+                            <Video size={16} /> Add Video
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => addLesson(m.id, "document")}
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-white border rounded-xl hover:bg-gray-50"
+                          >
+                            <FileText size={16} /> Add Document
+                          </button>
+                        </div>
+                      </div>
+
+                      {grouped.length === 0 ? (
+                        <div className="p-4 text-sm text-gray-500 bg-white border rounded-xl">
+                          No lessons (or none in selected week).
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {grouped.map(({ week, items }) => (
+                            <div
+                              key={week}
+                              className="overflow-hidden bg-white border rounded-2xl"
+                            >
+                              <div className="flex items-center justify-between px-4 py-3 bg-white border-b">
+                                <div className="font-semibold text-gray-900">
+                                  Week {week}
+                                </div>
+                                <Pill className="text-gray-700 border-gray-200 bg-gray-50">
+                                  {items.length} lesson{items.length > 1 ? "s" : ""}
+                                </Pill>
+                              </div>
+
+                              <div className="p-4 space-y-3">
+                                {items.map((l) => {
+                                  const meta =
+                                    lessonTypeMeta[l.content_type] || lessonTypeMeta.document;
+                                  const Icon = meta.icon;
+
+                                  return (
+                                    <div
+                                      key={l.id}
+                                      className="p-4 transition bg-white border rounded-2xl hover:shadow-sm"
+                                    >
+                                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                        <div className="flex-1">
+                                          {/* Badges */}
+                                          <div className="flex flex-wrap items-center gap-2 mb-3">
+                                            <Pill className={meta.badge}>
+                                              <Icon size={14} />
+                                              {meta.label}
+                                            </Pill>
+                                            <Pill className="text-gray-700 border-gray-200 bg-gray-50">
+                                              Lesson {l.order ?? "-"}
+                                            </Pill>
+                                            {l._isNew ? (
+                                              <Pill className="bg-amber-50 text-amber-700 border-amber-200">
+                                                New
+                                              </Pill>
+                                            ) : null}
+                                          </div>
+
+                                          {/* Fields */}
+                                          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                            <div className="md:col-span-2">
+                                              <label className="text-xs text-gray-500">
+                                                Lesson title
+                                              </label>
+                                              <input
+                                                className="w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                                placeholder="Lesson title"
+                                                value={l.title}
+                                                onChange={(e) =>
+                                                  updateLesson(m.id, l.id, "title", e.target.value)
+                                                }
+                                              />
+                                            </div>
+
+                                            <div>
+                                              <label className="text-xs text-gray-500">
+                                                Week (UI only)
+                                              </label>
+                                              <input
+                                                type="number"
+                                                min={1}
+                                                className="w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                                value={l.week || 1}
+                                                onChange={(e) =>
+                                                  updateLesson(
+                                                    m.id,
+                                                    l.id,
+                                                    "week",
+                                                    Number(e.target.value || 1)
+                                                  )
+                                                }
+                                              />
+                                            </div>
+
+                                            {/* Upload switch */}
+                                            <div className="md:col-span-3">
+                                              <label className="text-xs text-gray-500">
+                                                Content
+                                              </label>
+                                              <div className="flex flex-wrap gap-2 mt-2">
+                                                <ToggleChip
+                                                  active={l.uploadType === "url"}
+                                                  icon={LinkIcon}
+                                                  label="URL"
+                                                  onClick={() => {
+                                                    updateLesson(m.id, l.id, "uploadType", "url");
+                                                    updateLesson(m.id, l.id, "file", null);
+                                                  }}
+                                                />
+                                                <ToggleChip
+                                                  active={l.uploadType === "file"}
+                                                  icon={Upload}
+                                                  label="Upload Document"
+                                                  onClick={() => {
+                                                    updateLesson(m.id, l.id, "uploadType", "file");
+                                                    updateLesson(m.id, l.id, "content_url_or_text", "");
+                                                  }}
+                                                />
+                                              </div>
+
+                                              {/* URL input */}
+                                              {l.uploadType === "url" ? (
+                                                <input
+                                                  className="w-full px-3 py-2 mt-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                                  placeholder="https://... or text"
+                                                  value={l.content_url_or_text}
+                                                  onChange={(e) =>
+                                                    updateLesson(
+                                                      m.id,
+                                                      l.id,
+                                                      "content_url_or_text",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                />
+                                              ) : (
+                                                <div className="mt-3">
+                                                  <input
+                                                    type="file"
+                                                    accept=".pdf,.doc,.docx,.ppt,.pptx"
+                                                    className="w-full px-3 py-2 bg-white border rounded-xl"
+                                                    onChange={(e) =>
+                                                      onLessonFilePick(
+                                                        m.id,
+                                                        l.id,
+                                                        e.target.files?.[0] || null
+                                                      )
+                                                    }
+                                                  />
+                                                  {l.file ? (
+                                                    <p className="mt-2 text-xs text-gray-600">
+                                                      Selected:{" "}
+                                                      <span className="font-semibold">
+                                                        {l.file.name}
+                                                      </span>
+                                                    </p>
+                                                  ) : (
+                                                    <p className="mt-2 text-xs text-gray-500">
+                                                      Upload a PDF/DOC/DOCX/PPT file.
+                                                    </p>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            <div>
+                                              <label className="text-xs text-gray-500">
+                                                Duration (min)
+                                              </label>
+                                              <input
+                                                type="number"
+                                                min={0}
+                                                className="w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                                placeholder="e.g. 15"
+                                                value={l.duration_minutes}
+                                                onChange={(e) =>
+                                                  updateLesson(
+                                                    m.id,
+                                                    l.id,
+                                                    "duration_minutes",
+                                                    e.target.value
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => removeLesson(m.id, l.id)}
+                                          className="inline-flex items-center self-start justify-center gap-2 px-3 py-2 text-red-600 border rounded-xl hover:bg-red-50"
+                                        >
+                                          <Trash2 size={16} /> Remove
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-4 text-xs text-gray-500">
+                        Quick tip: Next suggested week is{" "}
+                        <span className="font-semibold">Week {nextWeekHint}</span>.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Spacer for sticky footer */}
+          <div className="h-20" />
+        </form>
+      </div>
+
+      {/* Sticky Save Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t">
+        <div className="flex items-center justify-between max-w-6xl gap-3 px-6 py-4 mx-auto">
+          <div className="text-sm text-gray-600">
+            {loading
+              ? "Saving changes..."
+              : "Click Save to persist modules + lessons (URL or uploaded document)."}
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => handleSubmit(e)}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 text-white bg-green-600 rounded-2xl hover:bg-green-700 disabled:opacity-60"
+          >
+            <Save size={18} />
+            {loading ? "Saving..." : "Save"}
+          </button>
         </div>
       </div>
     </div>

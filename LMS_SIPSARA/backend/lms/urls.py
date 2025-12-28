@@ -17,7 +17,7 @@ from .views import (
     PasswordResetConfirmView,
     PasswordResetRequestView,
     ReceptionRegisterlistView,
-    WebsiteTrafficAPIView,
+    UserActivityStatsAPI,
 )
 
 urlpatterns = [
@@ -35,7 +35,7 @@ urlpatterns = [
     path("user/list/", UserListView.as_view(), name="user_list"),
     path("user/me/", CurrentUserView.as_view(), name="user_me"),
     path("register/receptionist/list/", ReceptionRegisterlistView.as_view(), name="user_me_detail"),
-    path('website-traffic/', WebsiteTrafficAPIView.as_view(), name='website-traffic'),
+    path('dashboard/user-activity/', UserActivityStatsAPI.as_view(), name='user-activity'),
     
     # Student endpoints
     path("student/", studentviewlist.as_view(), name="studentviewlist"),

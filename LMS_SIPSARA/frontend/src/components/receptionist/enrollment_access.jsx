@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, AlertCircle, Loader, Trash2, Clock, CheckCircle, XCircle, Edit2, TrendingUp, RefreshCw } from 'lucide-react';
+import {
+  Plus, X, AlertCircle, Loader, Trash2, Clock,
+  CheckCircle, XCircle, Edit2, TrendingUp, RefreshCw
+} from 'lucide-react';
 import authService from '@/context/authService';
 
-const EnrollmentAccess = ({ 
+const EnrollmentAccess = ({
   selectedStudent,
-  enrollments = [], 
-  loading, 
-  error, 
+  enrollments = [],
+  loading,
+  error,
   onRefresh,
   isStudentSpecific = false
 }) => {
@@ -21,7 +24,7 @@ const EnrollmentAccess = ({
   const [fetchError, setFetchError] = useState(null);
 
   const [createForm, setCreateForm] = useState({
-    course_id: '',
+    course_id: '', // IMPORTANT: this will hold Course.id (PK)
     enrollment_days: 30,
   });
 
@@ -29,60 +32,67 @@ const EnrollmentAccess = ({
     enrollment_days: 30,
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     const authToken = authService.getToken();
     setToken(authToken);
+
+    // only fetch when student changes
     fetchCourses();
     fetchEnrollments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudent]);
 
-  // ✅ Fetch enrollments for the selected student - CORRECTED ENDPOINT
+  // ✅ Fetch enrollments for the selected student
+  // Your backend filters using Student.user_id (User id), so we must pass user_id
   const fetchEnrollments = async () => {
-    if (!selectedStudent || !selectedStudent.id) {
+    if (!selectedStudent) {
       setLocalEnrollments([]);
       return;
     }
-    
+
+    const studentUserId =
+      selectedStudent.user_id ??
+      selectedStudent.user?.id ??
+      selectedStudent.user?.user_id;
+
+    if (!studentUserId) {
+      // fallback: avoid calling wrong id
+      setLocalEnrollments([]);
+      return;
+    }
+
     try {
       setFetchError(null);
-      const token = authService.getToken();
-      
-      // ✅ CORRECTED: Use student_id parameter (not user_id)
-      // AND use the proper endpoint /enrollments/ with student_id query param
+      const t = authService.getToken();
+
       const response = await fetch(
-        `http://localhost:8000/Course/enrollments/?student_id=${selectedStudent.id}`,
+        `http://localhost:8000/Course/enrollments/?student_id=${studentUserId}`,
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${t}`,
             'Content-Type': 'application/json',
           },
         }
       );
 
-      console.log(`📥 Fetching enrollments for student ${selectedStudent.id}`);
+      console.log(`📥 Fetching enrollments for student user_id=${studentUserId}`);
 
       if (response.ok) {
         const data = await response.json();
-        
-        // Handle different response formats
+
         let enrollmentList = [];
-        if (Array.isArray(data)) {
-          enrollmentList = data;
-        } else if (data.results) {
-          enrollmentList = data.results;
-        } else if (data.enrollments) {
-          enrollmentList = data.enrollments;
-        } else if (data.data) {
-          enrollmentList = data.data;
-        }
-        
+        if (Array.isArray(data)) enrollmentList = data;
+        else if (data.results) enrollmentList = data.results;
+        else if (data.enrollments) enrollmentList = data.enrollments;
+        else if (data.data) enrollmentList = data.data;
+
         console.log('✅ Enrollments fetched:', enrollmentList);
         setLocalEnrollments(enrollmentList);
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         console.error('❌ Fetch error:', response.status, errorData);
-        setFetchError(`Failed to fetch enrollments: ${response.status}`);
+        setFetchError(errorData?.detail || errorData?.error || `Failed to fetch enrollments: ${response.status}`);
         setLocalEnrollments([]);
       }
     } catch (err) {
@@ -96,12 +106,12 @@ const EnrollmentAccess = ({
   const fetchCourses = async () => {
     try {
       setCourseLoading(true);
-      const token = authService.getToken();
-      
+      const t = authService.getToken();
+
       let response = await fetch('http://localhost:8000/Course/courses/list/admin/', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${t}`,
           'Content-Type': 'application/json',
         },
       });
@@ -110,7 +120,7 @@ const EnrollmentAccess = ({
         response = await fetch('http://localhost:8000/Course/courses/list/', {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${t}`,
             'Content-Type': 'application/json',
           },
         });
@@ -120,7 +130,7 @@ const EnrollmentAccess = ({
         response = await fetch('http://localhost:8000/Course/courses/', {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${t}`,
             'Content-Type': 'application/json',
           },
         });
@@ -128,20 +138,22 @@ const EnrollmentAccess = ({
 
       if (response.ok) {
         const data = await response.json();
-        
+
         let courseList = [];
-        if (Array.isArray(data)) {
-          courseList = data;
-        } else if (data.results) {
-          courseList = data.results;
-        } else if (data.courses) {
-          courseList = data.courses;
-        } else if (data.data) {
-          courseList = data.data;
-        }
-        
-        console.log('✅ Courses loaded:', courseList);
-        setCourses(courseList);
+        if (Array.isArray(data)) courseList = data;
+        else if (data.results) courseList = data.results;
+        else if (data.courses) courseList = data.courses;
+        else if (data.data) courseList = data.data;
+
+        // Normalize: ensure we have course PK as `id`
+        const normalized = (courseList || []).filter(Boolean).map((c) => ({
+          ...c,
+          _pk: c.id,                 // backend EnrollmentCreateAPIView uses Course.id
+          _publicCourseId: c.course_id, // optional: useful for payment module if needed
+        }));
+
+        console.log('✅ Courses loaded:', normalized);
+        setCourses(normalized);
       } else {
         console.error('❌ Failed to fetch courses:', response.statusText);
         setCourses([]);
@@ -161,16 +173,19 @@ const EnrollmentAccess = ({
       return;
     }
 
-    if (!selectedStudent || !selectedStudent.id) {
+    if (!selectedStudent?.id) {
       alert('No student selected');
       return;
     }
 
     try {
       setIsLoading(true);
-      
+
+      // IMPORTANT:
+      // - course_id MUST be Course.id (PK) because backend does Course, id=course_id :contentReference[oaicite:3]{index=3}
+      // - student_ids currently expects Student.id because backend does Student, id=int(student_ids[0]) :contentReference[oaicite:4]{index=4}
       const requestBody = {
-        course_id: parseInt(createForm.course_id),
+        course_id: parseInt(createForm.course_id, 10),
         student_ids: [selectedStudent.id],
         enrollment_days: createForm.enrollment_days,
       };
@@ -180,33 +195,31 @@ const EnrollmentAccess = ({
       const response = await fetch('http://localhost:8000/Course/enrollments/create/', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('❌ Response error:', error);
-        throw new Error(error.error || error.message || 'Failed to create enrollment');
+        const errJson = await response.json().catch(() => ({}));
+        console.error('❌ Response error:', errJson);
+        throw new Error(errJson.error || errJson.detail || errJson.message || 'Failed to create enrollment');
       }
 
       const data = await response.json();
       console.log('✅ Enrollment created:', data);
-      
-      // Add the new enrollment to local list
+
       if (data.enrollment) {
-        setLocalEnrollments([...localEnrollments, data.enrollment]);
+        setLocalEnrollments((prev) => [...prev, data.enrollment]);
       }
-      
+
       alert('Enrollment created successfully!');
       setCreateForm({ course_id: '', enrollment_days: 30 });
       setShowCreateModal(false);
-      
-      // Refresh enrollments from backend
+
       fetchEnrollments();
-      onRefresh();
+      onRefresh?.();
     } catch (err) {
       console.error('❌ Error creating enrollment:', err);
       alert(`Error: ${err.message}`);
@@ -229,7 +242,7 @@ const EnrollmentAccess = ({
         {
           method: 'PUT',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -239,17 +252,17 @@ const EnrollmentAccess = ({
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to extend enrollment');
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || errJson.detail || 'Failed to extend enrollment');
       }
 
       alert('Enrollment extended successfully!');
       setShowExtendModal(false);
       setSelectedEnrollment(null);
       setExtendForm({ enrollment_days: 30 });
-      
+
       fetchEnrollments();
-      onRefresh();
+      onRefresh?.();
     } catch (err) {
       console.error('❌ Error extending enrollment:', err);
       alert(`Error: ${err.message}`);
@@ -260,9 +273,7 @@ const EnrollmentAccess = ({
 
   // ✅ Delete enrollment
   const handleDeleteEnrollment = async (enrollmentId) => {
-    if (!window.confirm('Are you sure you want to revoke this enrollment?')) {
-      return;
-    }
+    if (!window.confirm('Are you sure you want to revoke this enrollment?')) return;
 
     try {
       setIsLoading(true);
@@ -271,23 +282,19 @@ const EnrollmentAccess = ({
         {
           method: 'DELETE',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         }
       );
 
-      if (!response.ok) {
-        throw new Error('Failed to delete enrollment');
-      }
+      if (!response.ok) throw new Error('Failed to delete enrollment');
 
       alert('Enrollment revoked successfully!');
-      
-      // Remove from local list
-      setLocalEnrollments(localEnrollments.filter(e => e.id !== enrollmentId));
-      
+      setLocalEnrollments((prev) => prev.filter((e) => e.id !== enrollmentId));
+
       fetchEnrollments();
-      onRefresh();
+      onRefresh?.();
     } catch (err) {
       console.error('❌ Error deleting enrollment:', err);
       alert(`Error: ${err.message}`);
@@ -298,43 +305,36 @@ const EnrollmentAccess = ({
 
   // Combine both local and parent enrollments
   const allEnrollments = [...localEnrollments, ...enrollments];
-  
-  // ✅ FIXED: Deduplicate enrollments by course_id to get unique courses
+
+  // Deduplicate enrollments by course_id
   const deduplicateEnrollments = (enrollmentList) => {
     const seen = new Set();
-    return enrollmentList.filter(enrollment => {
+    return enrollmentList.filter((enrollment) => {
       const courseId = enrollment.course_id || enrollment.course?.id;
-      if (seen.has(courseId)) {
-        return false;  // Skip duplicate
-      }
+      if (seen.has(courseId)) return false;
       seen.add(courseId);
       return true;
     });
   };
-  
-  // Use deduplicated enrollments for counting and filtering
+
   const uniqueEnrollments = deduplicateEnrollments(allEnrollments);
 
-  // ✅ Get badge color based on status
   const getStatusBadgeColor = (enrollment) => {
     if (enrollment.is_expired) return 'bg-red-100 text-red-800';
     if (enrollment.days_remaining <= 7) return 'bg-yellow-100 text-yellow-800';
     return 'bg-green-100 text-green-800';
   };
 
-  // ✅ Get status text
   const getStatusText = (enrollment) => {
     if (enrollment.is_expired) return 'Expired';
     if (enrollment.days_remaining <= 7) return 'Expiring Soon';
     return 'Active';
   };
 
-  // ✅ Filter enrollments (using deduplicated list)
-  const activeEnrollments = uniqueEnrollments.filter(e => !e.is_expired && e.days_remaining > 7);
-  const expiringEnrollments = uniqueEnrollments.filter(e => !e.is_expired && e.days_remaining <= 7);
-  const expiredEnrollments = uniqueEnrollments.filter(e => e.is_expired);
+  const activeEnrollments = uniqueEnrollments.filter((e) => !e.is_expired && e.days_remaining > 7);
+  const expiringEnrollments = uniqueEnrollments.filter((e) => !e.is_expired && e.days_remaining <= 7);
+  const expiredEnrollments = uniqueEnrollments.filter((e) => e.is_expired);
 
-  // ✅ Enrollment Card Component
   const EnrollmentCard = ({ enrollment }) => (
     <div className="p-4 transition border border-gray-200 rounded-lg hover:shadow-md">
       <div className="flex items-start justify-between mb-3">
@@ -355,7 +355,7 @@ const EnrollmentAccess = ({
         <div className="flex justify-between">
           <span className="text-gray-600">Started:</span>
           <span className="font-medium text-gray-900">
-            {new Date(enrollment.started_at).toLocaleDateString()}
+            {new Date(enrollment.started_at || enrollment.date).toLocaleDateString()}
           </span>
         </div>
         <div className="flex justify-between">
@@ -451,7 +451,7 @@ const EnrollmentAccess = ({
         </div>
       )}
 
-      {/* Loading */}
+      {/* Loading / Empty / List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader className="text-blue-600 animate-spin" size={32} />
@@ -470,7 +470,6 @@ const EnrollmentAccess = ({
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Active Enrollments */}
           {activeEnrollments.length > 0 && (
             <div>
               <h3 className="flex items-center gap-2 mb-4 text-lg font-semibold text-gray-900">
@@ -485,7 +484,6 @@ const EnrollmentAccess = ({
             </div>
           )}
 
-          {/* Expiring Soon */}
           {expiringEnrollments.length > 0 && (
             <div>
               <h3 className="flex items-center gap-2 mb-4 text-lg font-semibold text-gray-900">
@@ -500,7 +498,6 @@ const EnrollmentAccess = ({
             </div>
           )}
 
-          {/* Expired */}
           {expiredEnrollments.length > 0 && (
             <div>
               <h3 className="flex items-center gap-2 mb-4 text-lg font-semibold text-gray-900">
@@ -534,11 +531,16 @@ const EnrollmentAccess = ({
             {selectedStudent && (
               <div className="p-3 mb-4 rounded-lg bg-blue-50">
                 <p className="text-sm text-gray-600">
-                  Student: <span className="font-medium text-gray-900">
-                    {selectedStudent.firstName || selectedStudent.username} {selectedStudent.lastName || ''}
+                  Student:{' '}
+                  <span className="font-medium text-gray-900">
+                    {selectedStudent.firstName || selectedStudent.username}{' '}
+                    {selectedStudent.lastName || ''}
                   </span>
                 </p>
-                <p className="text-xs text-gray-500">ID: {selectedStudent.id}</p>
+                <p className="text-xs text-gray-500">Student ID: {selectedStudent.id}</p>
+                {selectedStudent.user_id && (
+                  <p className="text-xs text-gray-500">User ID: {selectedStudent.user_id}</p>
+                )}
               </div>
             )}
 
@@ -557,8 +559,8 @@ const EnrollmentAccess = ({
                     onChange={(e) => setCreateForm({ ...createForm, course_id: e.target.value })}
                   >
                     <option value="">Select a course...</option>
-                    {courses.map(course => (
-                      <option key={course.id} value={course.id}>
+                    {courses.map((course) => (
+                      <option key={course._pk} value={course._pk}>
                         {course.title} {course.level ? `- ${course.level}` : ''}
                       </option>
                     ))}
@@ -575,10 +577,14 @@ const EnrollmentAccess = ({
                 <input
                   type="number"
                   min="1"
-                  placeholder="Default: 30 days"
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   value={createForm.enrollment_days}
-                  onChange={(e) => setCreateForm({ ...createForm, enrollment_days: parseInt(e.target.value) || 30 })}
+                  onChange={(e) =>
+                    setCreateForm({
+                      ...createForm,
+                      enrollment_days: parseInt(e.target.value, 10) || 30,
+                    })
+                  }
                 />
               </div>
             </div>
@@ -617,8 +623,16 @@ const EnrollmentAccess = ({
             </div>
 
             <div className="p-3 mb-4 rounded-lg bg-blue-50">
-              <p className="text-sm text-gray-600">Course: <span className="font-medium">{selectedEnrollment.course?.title || selectedEnrollment.course_title}</span></p>
-              <p className="text-sm text-gray-600">Current Days Remaining: <span className="font-medium text-blue-600">{selectedEnrollment.days_remaining}</span></p>
+              <p className="text-sm text-gray-600">
+                Course:{' '}
+                <span className="font-medium">
+                  {selectedEnrollment.course?.title || selectedEnrollment.course_title}
+                </span>
+              </p>
+              <p className="text-sm text-gray-600">
+                Current Days Remaining:{' '}
+                <span className="font-medium text-blue-600">{selectedEnrollment.days_remaining}</span>
+              </p>
             </div>
 
             <div>
@@ -626,10 +640,9 @@ const EnrollmentAccess = ({
               <input
                 type="number"
                 min="1"
-                placeholder="Number of days to add"
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={extendForm.enrollment_days}
-                onChange={(e) => setExtendForm({ enrollment_days: parseInt(e.target.value) || 30 })}
+                onChange={(e) => setExtendForm({ enrollment_days: parseInt(e.target.value, 10) || 30 })}
               />
             </div>
 

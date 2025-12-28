@@ -9,107 +9,44 @@ import TeamsLMSChat from '@/components/chat';
 import UserDataPanel from '@/components/SUadmin/teacheradd';
 import Topbar from '@/components/topbar';
 import ReceptionistManagementPanel from '@/components/SUadmin/receptionistadd';
+import FeedbackPanel from "../courseData/feedback";
 import SettingsPanel from '@/components/setting';
 import authService  from '@/context/authService'; 
 import { userService } from '@/config/user.config';
 import { courseService } from '@/config/course.config';
+import { paymentService } from '@/config/payment.config';
 
 
-
-
-
-
-// Sample data for charts - Replace with real API data
-
-  
-// Monthly income data
-const monthlyIncomeData = [
-  { month: 'Jan', income: 450000, expenses: 320000, profit: 130000 },
-  { month: 'Feb', income: 520000, expenses: 340000, profit: 180000 },
-  { month: 'Mar', income: 680000, expenses: 380000, profit: 300000 },
-  { month: 'Apr', income: 750000, expenses: 400000, profit: 350000 },
-  { month: 'May', income: 820000, expenses: 420000, profit: 400000 },
-  { month: 'Jun', income: 950000, expenses: 450000, profit: 500000 },
-  { month: 'Jul', income: 1050000, expenses: 480000, profit: 570000 },
-  { month: 'Aug', income: 1120000, expenses: 500000, profit: 620000 },
-  { month: 'Sep', income: 980000, expenses: 470000, profit: 510000 },
-  { month: 'Oct', income: 890000, expenses: 460000, profit: 430000 },
-  { month: 'Nov', income: 920000, expenses: 450000, profit: 470000 },
-  { month: 'Dec', income: 1200000, expenses: 520000, profit: 680000 },
-];
-
-// Yearly income comparison
-const yearlyIncomeData = [
-  { year: '2020', income: 6500000, expenses: 4200000, profit: 2300000 },
-  { year: '2021', income: 7800000, expenses: 4800000, profit: 3000000 },
-  { year: '2022', income: 9200000, expenses: 5400000, profit: 3800000 },
-  { year: '2023', income: 10500000, expenses: 5900000, profit: 4600000 },
-  { year: '2024', income: 11330000, expenses: 5550000, profit: 5780000 },
-];
-
-// Enrollment per course data
-const enrollmentData = [
-  { course: 'Mathematics O/L', enrolled: 145, capacity: 200, percentage: 73 },
-  { course: 'Physics A/L', enrolled: 98, capacity: 150, percentage: 65 },
-  { course: 'English', enrolled: 187, capacity: 200, percentage: 94 },
-  { course: 'Chemistry A/L', enrolled: 112, capacity: 150, percentage: 75 },
-  { course: 'Biology O/L', enrolled: 156, capacity: 200, percentage: 78 },
-  { course: 'ICT', enrolled: 134, capacity: 180, percentage: 74 },
-  { course: 'Commerce', enrolled: 89, capacity: 120, percentage: 74 },
-  { course: 'Sinhala', enrolled: 167, capacity: 200, percentage: 84 },
-];
-
-
-
-// Course distribution by department
-const departmentData = [
-  { name: 'Science', value: 35, color: '#2DD4BF' },
-  { name: 'Mathematics', value: 28, color: '#F59E0B' },
-  { name: 'Languages', value: 22, color: '#A855F7' },
-  { name: 'Commerce', value: 15, color: '#EC4899' },
-];
-
-const COLORS = ['#2DD4BF', '#F59E0B', '#A855F7', '#EC4899'];
+const COLORS = ['#2DD4BF', '#F59E0B', '#A855F7', '#EC4899', '#3B82F6', '#10B981', '#F97316'];
+const userType = (localStorage.getItem("userType") || "").toLowerCase();
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [departmentData, setDepartmentData] = useState([]);
+  const [userActivityData, setUserActivityData] = useState([]);
+  const [financialData, setFinancialData] = useState([]);
+  
+  
+  // Stats State
   const [teacherCount, setTeacherCount] = useState(0);
   const [receptionistsCount, setReceptionistsCount] = useState(0);
   const [studentsCount, setStudentsCount] = useState(0);
   const [coursesCount, setCoursesCount] = useState(0);
+  
+  // Data State
+  const [enrollmentData, setEnrollmentData] = useState([]);
+  
   const [loadingStats, setLoadingStats] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const [user, setUser] = useState(null);
-  const [websiteTrafficData, setWebsiteTrafficData] = useState([]);
 
- 
-
-  // ✅ Use centralized auth service for API calls
-  const fetchWithAuth = async (url) => {
-    const token = authService.getToken();
-    const headers = {
-      'Content-Type': 'application/json',
-      ...authService.getAuthHeaders() // ✅ Use auth service method
-    };
-
-    try {
-      const response = await fetch(url, { headers });
-      return response;
-    } catch (error) {
-      console.error('Fetch error:', error);
-      throw error;
-    }
-  };
-
-  // ✅ FIXED: Handle getCurrentUser safely with fallback
+  // ✅ 1. Fetch User Data
   useEffect(() => {
     try {
-      // Check if getCurrentUser exists as a function
       if (typeof authService.getCurrentUser === 'function') {
         const currentUser = authService.getCurrentUser();
         setUser(currentUser);
       } else if (authService.getToken()) {
-        // Fallback: Parse user from JWT token
         const token = authService.getToken();
         try {
           const base64Url = token.split('.')[1];
@@ -126,8 +63,6 @@ export default function AdminDashboard() {
           console.warn('Could not decode user from token:', decodeError);
           setUser(null);
         }
-      } else {
-        setUser(null);
       }
     } catch (error) {
       console.error('Error getting current user:', error);
@@ -135,94 +70,107 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // ✅ Check authentication on mount
   useEffect(() => {
-    if (!authService.isAuthenticated()) {
-      console.warn('User is not authenticated');
-      // Optionally redirect to login
-      // window.location.href = '/login';
-    }
+    const fetchFinancials = async () => {
+      try {
+        const data = await paymentService.getFinancialStats(selectedPeriod);
+        setFinancialData(data);
+      } catch (error) {
+        console.error("Error fetching financial stats:", error);
+      }
+    };
+    fetchFinancials();
+  }, [selectedPeriod]);
+
+  // ✅ Fetch User Activity (for Area Chart)
+  useEffect(() => {
+    const fetchUserActivity = async () => {
+      try {
+        const data = await userService.getuseractivity();
+        setUserActivityData(data);
+      } catch (error) {
+        console.error("Error fetching user activity:", error);
+      }
+    };
+    fetchUserActivity();
   }, []);
 
-  // ✅ Fetch student count with auth service
-useEffect(() => {
-  const loadStudents = async () => {
-    try {
-      setStudentsCount(await userService.getStudentsCount());
-    } catch (err) {
-      console.error(err);
-      setStudentsCount(0);
-    }
-  };
-  loadStudents();
-}, []); 
-
-
-  // ✅ Fetch teacher count with auth service
+  // ✅ Fetch Department Data
   useEffect(() => {
-  const loadTeachers = async () => {
-    try {
-      setTeacherCount(await userService.getTeachersCount());
-    } catch (err) {
-      console.error(err);
-      setTeacherCount(0);
-    }
-  };
-  loadTeachers();
-}, []);
+    const fetchDepartmentData = async () => {
+      try {
+        const data = await courseService.getCourseDistribution();
+        
+        // Map colors to the data (cycle through the COLORS array)
+        const coloredData = data.map((item, index) => ({
+          ...item,
+          color: COLORS[index % COLORS.length] // loops colors if there are many depts
+        }));
 
+        setDepartmentData(coloredData);
+      } catch (error) {
+        console.error("Error loading department stats:", error);
+        setDepartmentData([]);
+      }
+    };
+    fetchDepartmentData();
+  }, []);
 
-  // ✅ Fetch courses count with auth service
+  // ✅ Fetch Dashboard Counts
   useEffect(() => {
-  const loadCourses = async () => {
-    try {
-      setCoursesCount(await courseService.getCoursesCount());
-    } catch (err) {
-      console.error(err);
-      setCoursesCount(0);
-    }
-  };
-  loadCourses();
-}, []);
+    const loadStats = async () => {
+      try {
+        const [students, teachers, courses, receptionists] = await Promise.all([
+          userService.getStudentsCount().catch(() => 0),
+          userService.getTeachersCount().catch(() => 0),
+          courseService.getCoursesCount().catch(() => 0),
+          userService.getReceptionistsCount().catch(() => 0)
+        ]);
 
-  // ✅ Fetch receptionist count with auth service
+        setStudentsCount(students);
+        setTeacherCount(teachers);
+        setCoursesCount(courses);
+        setReceptionistsCount(receptionists);
+        setLoadingStats(false);
+      } catch (err) {
+        console.error("Error loading dashboard stats", err);
+        setLoadingStats(false);
+      }
+    };
+    loadStats();
+  }, []); 
+
+  // ✅ Fetch Enrollment Data for the Chart
   useEffect(() => {
-  const loadReceptionists = async () => {
-    try {
-      setReceptionistsCount(await userService.getReceptionistsCount());
-    } catch (err) {
-      console.error(err);
-      setReceptionistsCount(0);
-    }
-  };
-  loadReceptionists();
-}, []);
+    const fetchEnrollmentData = async () => {
+      try {
+        const data = await courseService.getEnrollmentStats();
+        
+        if (Array.isArray(data)) {
+          setEnrollmentData(data);
+        } else {
+          console.warn("API did not return an array", data);
+          setEnrollmentData([]);
+        }
+      } catch (error) {
+        console.error('Error fetching enrollment data:', error);
+        setEnrollmentData([]);
+      }
+    };
+    fetchEnrollmentData();
+  }, []);
 
-  useEffect(() => {
-  // Only consider stats loaded when we have meaningful data
-  const allLoaded = teacherCount > 0 && studentsCount > 0 && receptionistsCount >= 0;
-  const coursesLoaded = coursesCount > 0; // ✅ Add separate check for courses
-  
-  if (allLoaded && coursesLoaded) {
-    setLoadingStats(false);
-  }
-}, [teacherCount, studentsCount, coursesCount, receptionistsCount]);
 
-  const formatCurrency = (value) => {
-    return `Rs.${(value / 1000).toFixed(1)}K`;
-  };
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab}
+       setActiveTab={setActiveTab}
+       userType={userType} />
 
-      {/* Main Content */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Topbar */}
         <Topbar />
 
-        {/* Page Content */}
         <main className="flex-1 overflow-auto">
           {activeTab === 'dashboard' && (
             <div className="p-8 space-y-8">
@@ -235,14 +183,11 @@ useEffect(() => {
 
               {/* Stats Cards */}
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {/* Total Students */}
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Total Students</p>
-                      <p className="mt-2 text-3xl font-bold text-gray-800">
-                        {studentsCount}
-                      </p>
+                      <p className="mt-2 text-3xl font-bold text-gray-800">{studentsCount}</p>
                     </div>
                     <div className="p-3 bg-blue-100 rounded-full">
                       <TrendingUp className="text-blue-600" size={24} />
@@ -251,14 +196,11 @@ useEffect(() => {
                   <p className="mt-4 text-sm text-gray-500">Active enrollments</p>
                 </div>
 
-                {/* Total Teachers */}
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Total Teachers</p>
-                      <p className="mt-2 text-3xl font-bold text-gray-800">
-                        {teacherCount}
-                      </p>
+                      <p className="mt-2 text-3xl font-bold text-gray-800">{teacherCount}</p>
                     </div>
                     <div className="p-3 bg-green-100 rounded-full">
                       <TrendingUp className="text-green-600" size={24} />
@@ -267,14 +209,11 @@ useEffect(() => {
                   <p className="mt-4 text-sm text-gray-500">Registered instructors</p>
                 </div>
 
-                {/* Total Courses */}
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Total Courses</p>
-                      <p className="mt-2 text-3xl font-bold text-gray-800">
-                        {coursesCount}
-                      </p>
+                      <p className="mt-2 text-3xl font-bold text-gray-800">{coursesCount}</p>
                     </div>
                     <div className="p-3 bg-purple-100 rounded-full">
                       <TrendingUp className="text-purple-600" size={24} />
@@ -283,14 +222,11 @@ useEffect(() => {
                   <p className="mt-4 text-sm text-gray-500">Active programs</p>
                 </div>
 
-                {/* Receptionists */}
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Receptionists</p>
-                      <p className="mt-2 text-3xl font-bold text-gray-800">
-                        {receptionistsCount}
-                      </p>
+                      <p className="mt-2 text-3xl font-bold text-gray-800">{receptionistsCount}</p>
                     </div>
                     <div className="p-3 bg-yellow-100 rounded-full">
                       <TrendingUp className="text-yellow-600" size={24} />
@@ -302,109 +238,131 @@ useEffect(() => {
 
               {/* First Row Charts */}
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {/* User Traffic Area Chart */}
+                
+                {/* ✅ FIXED: User Traffic Chart uses stacked areas for student/instructor/receptionist */}
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-gray-800">User Traffic</h3>
                     <p className="text-sm text-gray-500">Monthly user activity</p>
                   </div>
                   <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart
-                      data={websiteTrafficData}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
+                    <AreaChart data={userActivityData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <defs>
-                        <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="colorStudent" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
                           <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                        </linearGradient>
+                        <linearGradient id="colorInstructor" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0.1}/>
+                        </linearGradient>
+                        <linearGradient id="colorReceptionist" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.1}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis dataKey="month" stroke="#6b7280" />
                       <YAxis stroke="#6b7280" />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                      <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                      <Legend />
+
+                      <Area 
+                        type="monotone" 
+                        dataKey="student" 
+                        stackId="1" 
+                        stroke="#3B82F6" 
+                        fill="url(#colorStudent)" 
+                        name="Students" 
                       />
                       <Area 
                         type="monotone" 
-                        dataKey="total" 
-                        stroke="#3B82F6" 
-                        fillOpacity={1} 
-                        fill="url(#colorStudents)" 
+                        dataKey="instructor" 
+                        stackId="1" 
+                        stroke="#10B981" 
+                        fill="url(#colorInstructor)" 
+                        name="Instructors" 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="receptionist" 
+                        stackId="1" 
+                        stroke="#F59E0B" 
+                        fill="url(#colorReceptionist)" 
+                        name="Receptionists" 
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* Income Chart with Period Toggle */}
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-800">Financial Overview</h3>
                       <p className="text-sm text-gray-500">Income, expenses, and profit analysis</p>
                     </div>
+                    {/* Period Toggle Buttons */}
                     <div className="flex space-x-2">
-                      <button
-                        onClick={() => setSelectedPeriod('monthly')}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          selectedPeriod === 'monthly'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                      <button 
+                        onClick={() => setSelectedPeriod('monthly')} 
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedPeriod === 'monthly' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                       >
                         Monthly
                       </button>
-                      <button
-                        onClick={() => setSelectedPeriod('yearly')}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          selectedPeriod === 'yearly'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                      <button 
+                        onClick={() => setSelectedPeriod('yearly')} 
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedPeriod === 'yearly' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                       >
                         Yearly
                       </button>
                     </div>
                   </div>
+
+                  {/* 👇 3. UPDATED LINE CHART */}
                   <ResponsiveContainer width="100%" height={320}>
-                    <LineChart
-                      data={selectedPeriod === 'monthly' ? monthlyIncomeData : yearlyIncomeData}
+                    <LineChart 
+                      data={financialData} // ✅ Uses dynamic data
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis 
-                        dataKey={selectedPeriod === 'monthly' ? 'month' : 'year'} 
-                        stroke="#6b7280" 
-                      />
+                      
+                      {/* XAxis matches the 'name' key from API (Jan, Feb or 2023, 2024) */}
+                      <XAxis dataKey="name" stroke="#6b7280" />
+                      
                       <YAxis stroke="#6b7280" tickFormatter={(value) => `${(value/1000).toFixed(0)}K`} />
+                      
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                        formatter={(value) => formatCurrency(value)}
+                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} 
+                        formatter={(value) => `Rs. ${value.toLocaleString()}`} 
                       />
                       <Legend />
+                      
                       <Line 
                         type="monotone" 
                         dataKey="income" 
                         stroke="#10B981" 
-                        strokeWidth={3}
-                        dot={{ fill: '#10B981', r: 5 }}
+                        strokeWidth={3} 
+                        dot={{ fill: '#10B981', r: 5 }} 
                         activeDot={{ r: 7 }} 
+                        name="Income"
                       />
                       <Line 
                         type="monotone" 
                         dataKey="expenses" 
                         stroke="#EF4444" 
-                        strokeWidth={3}
-                        dot={{ fill: '#EF4444', r: 5 }}
+                        strokeWidth={3} 
+                        dot={{ fill: '#EF4444', r: 5 }} 
                         activeDot={{ r: 7 }} 
+                        name="Expenses"
                       />
                       <Line 
                         type="monotone" 
                         dataKey="profit" 
                         stroke="#3B82F6" 
-                        strokeWidth={3}
-                        dot={{ fill: '#3B82F6', r: 5 }}
+                        strokeWidth={3} 
+                        dot={{ fill: '#3B82F6', r: 5 }} 
                         activeDot={{ r: 7 }} 
+                        name="Profit"
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -413,42 +371,32 @@ useEffect(() => {
 
               {/* Second Row Charts */}
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {/* Enrollment per Course Bar Chart */}
+                
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-gray-800">Course Enrollment Status</h3>
-                    <p className="text-sm text-gray-500">Current enrollments vs capacity</p>
+                    <p className="text-sm text-gray-500">Current enrollments (Active)</p>
                   </div>
                   <ResponsiveContainer width="100%" height={320}>
-                    <BarChart
-                      data={enrollmentData}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <BarChart data={enrollmentData} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis 
                         dataKey="course" 
                         angle={-45} 
                         textAnchor="end" 
-                        height={100}
+                        height={80}
                         stroke="#6b7280"
                         tick={{ fontSize: 12 }}
+                        interval={0}
                       />
-                      <YAxis stroke="#6b7280" />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                        formatter={(value, name) => {
-                          if (name === 'percentage') return `${value}%`;
-                          return value;
-                        }}
-                      />
+                      <YAxis stroke="#6b7280" allowDecimals={false} />
+                      <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
                       <Legend />
-                      <Bar dataKey="enrolled" fill="#3B82F6" name="Enrolled" radius={[8, 8, 0, 0]} />
-                      <Bar dataKey="capacity" fill="#E5E7EB" name="Capacity" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="enrolled" fill="#3B82F6" name="Enrolled Students" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* Department Distribution Pie Chart */}
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-gray-800">Course Distribution by Department</h3>
@@ -471,20 +419,14 @@ useEffect(() => {
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                        />
+                        <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  {/* Legend */}
                   <div className="grid grid-cols-2 gap-4 mt-4">
                     {departmentData.map((dept, index) => (
                       <div key={index} className="flex items-center space-x-2">
-                        <div 
-                          className="w-4 h-4 rounded"
-                          style={{ backgroundColor: dept.color }}
-                        ></div>
+                        <div className="w-4 h-4 rounded" style={{ backgroundColor: dept.color }}></div>
                         <span className="text-sm text-gray-700">{dept.name}</span>
                         <span className="text-sm font-semibold text-gray-900">({dept.value})</span>
                       </div>
@@ -492,8 +434,6 @@ useEffect(() => {
                   </div>
                 </div>
               </div>
-
-              
             </div>
           )}
 
@@ -504,6 +444,7 @@ useEffect(() => {
           {activeTab === 'receptionists' && <ReceptionistManagementPanel />}
           {activeTab === 'chat' && <TeamsLMSChat />}
           {activeTab === 'settings' && <SettingsPanel />}
+          {activeTab === 'feedback' && <FeedbackPanel />}
         </main>
       </div>
     </div>

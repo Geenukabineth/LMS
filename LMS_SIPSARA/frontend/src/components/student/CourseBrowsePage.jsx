@@ -141,43 +141,44 @@ function CourseBrowsePage() {
   };
 
   // Add to cart (backend)
-  const addToCart = async (course) => {
-    const isInCart = cart.some(item => item.course_id === course.course_id);
-    if (isInCart) {
-      alert('This course is already in your cart');
-      return;
+ const addToCart = async (course) => {
+  const isInCart = cart.some((item) => item.course_id === course.course_id);
+  if (isInCart) {
+    alert("This course is already in your cart");
+    return;
+  }
+
+  try {
+    setCartLoading(true);
+    console.log("🛒 Adding course to cart:", course.course_id);
+
+    const response = await fetch(`${API_BASE_URL}/payment/cart/add/`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        course_id: course.course_id,
+      }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const msg = data?.error || data?.detail || response.statusText || "Bad Request";
+      throw new Error(msg);
     }
 
-    try {
-      setCartLoading(true);
-      console.log('🛒 Adding course to cart:', course.course_id);
+    console.log("✅ Added to cart:", data);
 
-      const response = await fetch(`${API_BASE_URL}/payment/cart/add/`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          course_id: course.course_id
-        })
-      });
+    await loadCartFromBackend();
+    setShowCartDrawer(true);
+  } catch (error) {
+    console.error("❌ Error adding to cart:", error);
+    alert("Failed to add course to cart: " + error.message);
+  } finally {
+    setCartLoading(false);
+  }
+};
 
-      if (!response.ok) {
-        throw new Error(`Failed to add to cart: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Added to cart:', data);
-
-      // Reload cart from backend
-      await loadCartFromBackend();
-      setShowCartDrawer(true);
-
-    } catch (error) {
-      console.error('❌ Error adding to cart:', error);
-      alert('Failed to add course to cart: ' + error.message);
-    } finally {
-      setCartLoading(false);
-    }
-  };
 
   // Remove from cart (backend)
   const removeFromCart = async (courseId) => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 
+
 const ActionButtons = ({ onAddFriend, onCreateGroup }) => {
   return (
     <div className="flex p-4 space-x-2 border-t border-gray-200">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+import notificationConfig from "@/config/notification.config";
 
 const CreateGroupModal = ({ isOpen, friends, onClose, onCreate, onNotification }) => {
   const [groupName, setGroupName] = useState('');
@@ -29,15 +29,16 @@ const CreateGroupModal = ({ isOpen, friends, onClose, onCreate, onNotification }
 
     setLoading(true);
     try {
-      const response = await apiCall(API_ENDPOINTS.GROUPS, {
-        method: 'POST',
-        body: JSON.stringify({
+      // ✅ FIX: Prepare the payload for the backend
+      const payload = {
           name: groupName,
           description: groupDescription,
-          member_ids: Array.from(selectedMembers),
-        }),
-      });
+          member_ids: Array.from(selectedMembers) // Convert Set to Array
+      };
 
+      // ✅ FIX: Call the correct API function
+      const response = await notificationConfig.CREATE_GROUP(payload);
+      
       if (response) {
         onNotification?.({
           type: 'success',
@@ -70,10 +71,7 @@ const CreateGroupModal = ({ isOpen, friends, onClose, onCreate, onNotification }
       <div className="p-6 overflow-y-auto bg-white rounded-lg shadow-xl w-96 max-h-96">
         <div className="sticky top-0 flex items-center justify-between mb-4 bg-white">
           <h2 className="text-xl font-bold text-gray-900">Create Group</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X className="w-6 h-6" />
           </button>
         </div>

@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Save, 
-  Bell, 
   Lock, 
-  Globe, 
-  Shield, 
-  Database, 
   Loader2, 
   Upload, 
   User, 
@@ -130,16 +126,6 @@ const SettingsComponent = () => {
     phoneNumber: '',
     full_name: '',
     profileImage: null,
-    platformName: 'EduAdmin LMS',
-    timeZone: 'UTC-08:00 (Pacific Time)',
-    platformDescription: 'A comprehensive learning management system for modern education.',
-    maintenanceMode: false,
-    emailNotifications: true,
-    pushNotifications: true,
-    emailFrequency: 'real-time',
-    passwordMinLength: true,
-    passwordCase: true,
-    passwordSpecialChars: false,
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
@@ -384,17 +370,14 @@ const SettingsComponent = () => {
 
   const tabs = [
     { id: 'general', label: 'General', icon: Settings },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Lock },
-    { id: 'system', label: 'System', icon: Globe },
-    { id: 'database', label: 'Database', icon: Database },
   ];
 
   const renderTabContent = () => {
     if (activeTab === 'general') {
       return (
         <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">
+          <h3 className="pb-2 mb-6 text-xl font-semibold text-gray-800 border-b">
             General Settings
           </h3>
           <div className="space-y-6">
@@ -404,20 +387,20 @@ const SettingsComponent = () => {
                   <img
                     src={previewImage}
                     alt="Profile"
-                    className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
+                    className="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
                     onError={(e) => {
                       e.target.onerror = null;
                       e.target.src = 'default-user.jpg';
                     }}
                   />
                 ) : (
-                  <div className="w-32 h-32 rounded-full bg-indigo-500 flex items-center justify-center border-4 border-white shadow-lg">
+                  <div className="flex items-center justify-center w-32 h-32 bg-indigo-500 border-4 border-white rounded-full shadow-lg">
                     <User size={48} className="text-white" />
                   </div>
                 )}
                 <label
                   htmlFor="profileImage"
-                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors"
+                  className="absolute bottom-0 right-0 p-2 text-white transition-colors bg-blue-600 rounded-full cursor-pointer hover:bg-blue-700"
                 >
                   <Upload className="w-5 h-5" />
                 </label>
@@ -429,10 +412,10 @@ const SettingsComponent = () => {
                   className="hidden"
                 />
               </div>
-              <p className="text-sm text-gray-500 mt-2">Upload a new profile picture</p>
+              <p className="mt-2 text-sm text-gray-500">Upload a new profile picture</p>
             </div>
             <div>
-              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="full_name" className="block mb-1 text-sm font-medium text-gray-700">
                 Full Name
               </label>
               <input
@@ -441,11 +424,11 @@ const SettingsComponent = () => {
                 name="full_name"
                 value={formData.full_name}
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="username" className="block mb-1 text-sm font-medium text-gray-700">
                 Username
               </label>
               <input
@@ -454,11 +437,11 @@ const SettingsComponent = () => {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block mb-1 text-sm font-medium text-gray-700">
                 Email
               </label>
               <input
@@ -467,11 +450,11 @@ const SettingsComponent = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
             <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="phoneNumber" className="block mb-1 text-sm font-medium text-gray-700">
                 Phone Number
               </label>
               <input
@@ -480,7 +463,7 @@ const SettingsComponent = () => {
                 name="phoneNumber"
                 value={formData.phoneNumber}
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
           </div>
@@ -491,14 +474,14 @@ const SettingsComponent = () => {
     if (activeTab === 'security') {
       return (
         <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">
+          <h3 className="pb-2 mb-6 text-xl font-semibold text-gray-800 border-b">
             Security Settings
           </h3>
-          {error && <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-100" role="alert">{error}</div>}
-          {successMessage && <div className="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-100" role="alert">{successMessage}</div>}
+          {error && <div className="p-4 mb-4 text-sm text-red-800 bg-red-100 rounded-lg" role="alert">{error}</div>}
+          {successMessage && <div className="p-4 mb-4 text-sm text-green-800 bg-green-100 rounded-lg" role="alert">{successMessage}</div>}
           <div className="space-y-6">
             <div>
-              <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="currentPassword" className="block mb-1 text-sm font-medium text-gray-700">
                 Current Password
               </label>
               <div className="relative">
@@ -508,19 +491,19 @@ const SettingsComponent = () => {
                   name="currentPassword"
                   value={formData.currentPassword}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute right-3 top-3 text-gray-500"
+                  className="absolute text-gray-500 right-3 top-3"
                 >
                   {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
             <div>
-              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="newPassword" className="block mb-1 text-sm font-medium text-gray-700">
                 New Password
               </label>
               <div className="relative">
@@ -530,19 +513,19 @@ const SettingsComponent = () => {
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-3 text-gray-500"
+                  className="absolute text-gray-500 right-3 top-3"
                 >
                   {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="confirmPassword" className="block mb-1 text-sm font-medium text-gray-700">
                 Confirm New Password
               </label>
               <div className="relative">
@@ -552,12 +535,12 @@ const SettingsComponent = () => {
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-3 text-gray-500"
+                  className="absolute text-gray-500 right-3 top-3"
                 >
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -578,174 +561,24 @@ const SettingsComponent = () => {
       );
     }
 
-    if (activeTab === 'notifications') {
-      return (
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">
-            Notification Preferences
-          </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div>
-                <label htmlFor="emailNotifications" className="text-lg font-medium text-gray-700">
-                  Email Notifications
-                </label>
-                <p className="text-sm text-gray-500">
-                  Receive updates and announcements via email.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                id="emailNotifications"
-                name="emailNotifications"
-                checked={formData.emailNotifications}
-                onChange={handleChange}
-                className="h-6 w-11 rounded-full appearance-none cursor-pointer transition-colors duration-200 ease-in-out bg-gray-300 checked:bg-blue-600 focus:outline-none"
-              />
-            </div>
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div>
-                <label htmlFor="pushNotifications" className="text-lg font-medium text-gray-700">
-                  Push Notifications
-                </label>
-                <p className="text-sm text-gray-500">
-                  Receive instant alerts on your device.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                id="pushNotifications"
-                name="pushNotifications"
-                checked={formData.pushNotifications}
-                onChange={handleChange}
-                className="h-6 w-11 rounded-full appearance-none cursor-pointer transition-colors duration-200 ease-in-out bg-gray-300 checked:bg-blue-600 focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (activeTab === 'system') {
-      return (
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">
-            System Configuration
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="mb-4">
-              <label htmlFor="platformName" className="block text-sm font-medium text-gray-700 mb-1">
-                Platform Name
-              </label>
-              <input
-                type="text"
-                id="platformName"
-                name="platformName"
-                value={formData.platformName}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div className="mb-4">
-              <label htmlFor="timeZone" className="block text-sm font-medium text-gray-700 mb-1">
-                Default Time Zone
-              </label>
-              <select
-                id="timeZone"
-                name="timeZone"
-                value={formData.timeZone}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="UTC+05:30 (India Standard Time)">UTC+05:30 (India Standard Time)</option>
-                <option value="UTC-08:00 (Pacific Time)">UTC-08:00 (Pacific Time)</option>
-                <option value="UTC+00:00 (Greenwich Mean Time)">UTC+00:00 (Greenwich Mean Time)</option>
-              </select>
-            </div>
-          </div>
-          <div className="mb-6">
-            <label htmlFor="platformDescription" className="block text-sm font-medium text-gray-700 mb-1">
-              Platform Description
-            </label>
-            <textarea
-              id="platformDescription"
-              name="platformDescription"
-              rows="3"
-              value={formData.platformDescription}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
-            ></textarea>
-          </div>
-          <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div>
-              <label htmlFor="maintenanceMode" className="text-lg font-medium text-gray-700">
-                Maintenance Mode
-              </label>
-              <p className="text-sm text-gray-500">
-                Temporarily shut down the site for updates.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              id="maintenanceMode"
-              name="maintenanceMode"
-              checked={formData.maintenanceMode}
-              onChange={handleChange}
-              className="h-6 w-11 rounded-full appearance-none cursor-pointer transition-colors duration-200 ease-in-out bg-gray-300 checked:bg-red-600 focus:outline-none"
-            />
-          </div>
-        </div>
-      );
-    }
-
-    if (activeTab === 'database') {
-      return (
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">
-            Data Management
-          </h3>
-          <div className="space-y-4">
-            <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-700">Last Backup</p>
-                <p className="text-sm text-gray-500">October 17, 2025 at 10:30 AM</p>
-              </div>
-              <button className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600 transition-colors">
-                Run Backup Now
-              </button>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-700">Export All User Data (GDPR)</p>
-                <p className="text-sm text-gray-500">Download a ZIP file containing all user data.</p>
-              </div>
-              <button className="bg-purple-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-600 transition-colors">
-                Export Data
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     return null;
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
+    <div className="min-h-screen p-8 bg-gray-100">
+      <h1 className="mb-8 text-3xl font-bold text-gray-900">Settings</h1>
 
       {activeTab !== 'security' && (
         <>
-          {error && <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-100" role="alert">{error}</div>}
-          {successMessage && <div className="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-100" role="alert">{successMessage}</div>}
+          {error && <div className="p-4 mb-4 text-sm text-red-800 bg-red-100 rounded-lg" role="alert">{error}</div>}
+          {successMessage && <div className="p-4 mb-4 text-sm text-green-800 bg-green-100 rounded-lg" role="alert">{successMessage}</div>}
         </>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col gap-8 lg:flex-row">
         <div className="lg:w-1/4">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
+          <div className="p-6 bg-white border border-gray-200 shadow-lg rounded-xl">
+            <h2 className="pb-2 mb-4 text-lg font-semibold text-gray-900 border-b">
               Settings Menu
             </h2>
             <nav className="space-y-2">
@@ -775,10 +608,10 @@ const SettingsComponent = () => {
         </div>
 
         <div className="flex-1">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-hidden bg-white border border-gray-200 shadow-lg rounded-xl">
             {renderTabContent()}
             {activeTab !== 'security' && (
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
                 <button
                   onClick={handleSave}
                   disabled={isSaving}

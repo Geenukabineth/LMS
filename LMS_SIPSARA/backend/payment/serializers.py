@@ -61,10 +61,23 @@ class TransactionSerializer(serializers.ModelSerializer):
         return None
     
     def get_courses(self, obj):
+        """
+        Returns list of courses with their related Teacher ID.
+        """
         return [{
             'title': course.title,
             'id': course.course_id,
-            'image': course.image.url if course.image else None
+            'image': course.image.url if course.image else None,
+            
+            # ✅ FIX: Use .pk instead of .id to prevent AttributeError
+            'teacher_id': course.teacher.pk if course.teacher else None,
+            
+            # Optional: Ensure full_name is accessed safely
+            'teacher_name': (
+                course.teacher.full_name 
+                if hasattr(course.teacher, 'full_name') 
+                else str(course.teacher) 
+            ) if course.teacher else "Unknown"
         } for course in obj.courses.all()]
     
     def create(self, validated_data):

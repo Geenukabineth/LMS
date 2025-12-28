@@ -12,9 +12,10 @@ from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from notification.middleware import TokenAuthMiddlewareStack
 from notification.routing import websocket_urlpatterns as notification_patterns 
+from chatroom.routing import chatroom_websocket_urlpatterns 
 
 # Combine patterns
-all_websocket_patterns = notification_patterns 
+all_websocket_patterns = notification_patterns + chatroom_websocket_urlpatterns
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),

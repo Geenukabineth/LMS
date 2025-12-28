@@ -1,10 +1,10 @@
-# chat/urls.py
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     FriendRequestViewSet, FriendshipViewSet, ChatViewSet, DirectMessageViewSet,
     GroupViewSet, GroupMessageViewSet, BlockedUserViewSet, NotificationViewSet,
-    UserOnlineStatusViewSet
+    UserOnlineStatusViewSet,UserViewSet
 )
 
 router = DefaultRouter()
@@ -17,6 +17,7 @@ router.register(r'group-messages', GroupMessageViewSet, basename='group-message'
 router.register(r'blocked-users', BlockedUserViewSet, basename='blocked-user')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'online-status', UserOnlineStatusViewSet, basename='online-status')
+router.register(r'users', UserViewSet, basename='user')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -1,7 +1,11 @@
 from django.urls import path
 
 from .views import (
-
+    AssignmentDetailAPIView,
+    QuizDetailAPIView,
+    QuizListCreateAPIView,
+    QuizQuestionDetailAPIView,
+    QuizQuestionListCreateAPIView,
     SearchCourseAPIView,
     CourseDetailAPIView,
     CourseCreateAPIView,
@@ -14,182 +18,105 @@ from .views import (
     TeacherCourseAssignmentAPIView,
     CourseTeacherListAPIView,
     EnrolledCourseListAPIView,
-    CoursesByLevelAPIView,
-    TeacherCoursesAPIView,
-    TeacherCourseCountAPIView,
-    TeacherCourseDetailAPIView,
     EnrollmentListAPIView,
     EnrollmentDetailAPIView,
     EnrollmentCreateAPIView,
     BulkEnrollmentCreateAPIView,
-    EnrollmentUpdateAPIView,
-    EnrollmentDestroyAPIView,
-    StudentEnrollmentsAPIView,
     EnrollmentExpiringAPIView,
-    # ✅ NEW: Student Portal Endpoints
     StudentEnrolledCoursesListAPIView,
     StudentEnrolledCourseDetailAPIView,
     StudentCourseProgressAPIView,
     StudentCourseLessonsAPIView,
     StudentCourseModulesAPIView,
     ModuleAPIView,
-    LessonCreateAPIView
+    LessonCreateAPIView,
+    EnrollmentDashboardStats,
+    CourseDistributionAPIView,
+    TeacherStudentEnrollmentListAPIView,
+    TeacherDashboardStatsAPIView,
+    AssignmentListCreateAPIView,
+    StudentDashboardStatsAPIView,
 )
 
- 
-
 urlpatterns = [
-
-    # --- Public Course Endpoints ---
-
+    # Public
     path('courses/search/', SearchCourseAPIView.as_view(), name='course-search'),
-
+    path("courses/", SearchCourseAPIView.as_view(), name="course-list"),
     path('courses/<slug:slug>/', CourseDetailAPIView.as_view(), name='course-detail'),
 
-   
-
-    # ✅ NEW: Admin course creation endpoint
-
+    # Admin course create
     path('admin/courses/create/', AdminCourseCreateAPIView.as_view(), name='admin-course-create'),
 
+    # Teacher assignment workflow
+    path('teacher/courses/assignments/', TeacherCourseAssignmentAPIView.as_view(), name='teacher-course-assignment'), 
+    path("teacher/courses/", CourseTeacherListAPIView.as_view(), name="teacher-course-list"),    # Teacher create course
+    path("teacher/courses/create/", CourseCreateAPIView.as_view(), name="teacher-course-create"),    # Teacher update course (by id)
+    path("teacher/courses/<int:id>/update/", CourseUpdateAPIView.as_view(), name="teacher-course-update"),    # Teacher delete course (by id)
    
+    path("teacher/courses/assignments/", TeacherCourseAssignmentAPIView.as_view(), name="teacher-course-assignments"),    # Teacher create module (for their course)
+    path("teacher/modules/", ModuleAPIView.as_view(), name="teacher-module-create"),    # Teacher create lesson (for their module)
+    path("teacher/modules/<int:course_id>/", ModuleAPIView.as_view(), name="teacher-module-update"),    # Teacher update module (for their course)
+    path("teacher/lessons/<int:course_id>/", LessonCreateAPIView.as_view(), name="teacher-lesson-create-for-module"),    # Teacher create lesson (for their course)
+    path("teacher/lessons/create/", LessonCreateAPIView.as_view(), name="teacher-lesson-create"),
 
-    # ✅ NEW: Teacher course assignment workflow
-
-    path('teacher/courses/assignments/', TeacherCourseAssignmentAPIView.as_view(), name='teacher-course-assignment'),
-
-   
-
-    # ✅ NEW: Teacher course count endpoint (FIXED - use this for teacher dashboard)
-
-    path('courses/teacher/count/', TeacherCourseCountAPIView.as_view(), name='teacher-course-count'),
-
-    path('teacher/courses/<int:course_id>/', TeacherCourseDetailAPIView.as_view(), name='teacher-course-count'),
-
-   
-
-    # --- Teacher/Management Endpoints (Authenticated) ---
-
-    path('create/courses/', CourseCreateAPIView.as_view(), name='course-create'),
-
-   
-
-    # Teacher's list of assigned courses
-
+    # Teacher list
     path('courses/teacher/list/', CourseTeacherListAPIView.as_view(), name='course-teacher-list'),
 
- 
-    # ============================================================================
-    # ✅ NEW: STUDENT PORTAL COURSE ENDPOINTS - EnrolledCourse Integration
-    # ============================================================================
-    
-    # Get all enrolled courses for authenticated student (Dashboard)
-    path('student/enrolled-courses/', StudentEnrolledCoursesListAPIView.as_view(), 
-         name='student-enrolled-courses-list'),
-    
-    # Get specific enrolled course details (Course Detail Page)
-    path('student/enrolled-courses/<int:course_id>/', StudentEnrolledCourseDetailAPIView.as_view(), 
-         name='student-enrolled-course-detail'),
-    
-    # Get course progress for student (Progress Bar, Completion %)
-    path('student/enrolled-courses/<int:course_id>/progress/', StudentCourseProgressAPIView.as_view(), 
-         name='student-course-progress'),
-    
-    # Get all lessons in enrolled course with completion status
-    path('student/enrolled-courses/<int:course_id>/lessons/', StudentCourseLessonsAPIView.as_view(), 
-         name='student-course-lessons'),
-    
-    # Get all modules in enrolled course with lesson breakdown
-    path('student/enrolled-courses/<int:course_id>/modules/', StudentCourseModulesAPIView.as_view(), 
-         name='student-course-modules'),
-
-    # ============================================================================
-    # ✅ EXISTING: Admin course list
-    # ============================================================================
-
-
-    path('courses/list/admin/', AdminCourseListAPIView.as_view(), name='course-list'),
-    path('courses/list/admin/<int:course_id>/', AdminCourseListAPIView.as_view(), name='course-list-paginated'),
-    
-    
-
-   
-
-    # FIXED: Course edit and delete - now support both slug and id
-
+    # Teacher CRUD (older)
+    path('create/courses/', CourseCreateAPIView.as_view(), name='course-create'),
     path('courses/edit/<int:id>/', CourseUpdateAPIView.as_view(), name='course-edit-id'),
-
     path('courses/edit/<slug:slug>/', CourseUpdateAPIView.as_view(), name='course-edit-slug'),
-
     path('courses/delete/<int:id>/', CourseDestroyAPIView.as_view(), name='course-delete-id'),
-
     path('courses/delete/<slug:slug>/', CourseDestroyAPIView.as_view(), name='course-delete-slug'),
 
-   
+    # Admin list/update/delete (same endpoint with different methods)
+    path('courses/list/admin/', AdminCourseListAPIView.as_view(), name='course-list-admin'),
+    path('courses/list/admin/<int:course_id>/', AdminCourseListAPIView.as_view(), name='course-list-admin-course'),
 
-    # Course count
-
-    path('courses/list/count/admin/', AdminCourseListAPIView.as_view(), name='course-count'),
-
-   
-
-    # --- Student/Enrollment Endpoints (Authenticated) ---
-
-   
-
-    # Student's list of enrolled courses
-
-    path('courses/student/enrolled/', EnrolledCourseListAPIView.as_view(), name='course-student-enrolled'),
-
-   
-
+    # Student enroll (paid or free logic)
     path('courses/enroll/<slug:course_slug>/', EnrollCourseAPIView.as_view(), name='course-enroll'),
 
-   
+    # Student enrolled list (legacy)
+    path('courses/student/enrolled/', EnrolledCourseListAPIView.as_view(), name='course-student-enrolled'),
 
-    # --- Utility Endpoints ---
+    # Student portal endpoints
+    path('student/enrolled-courses/', StudentEnrolledCoursesListAPIView.as_view(), name='student-enrolled-courses-list'),
+    path('student/enrolled-courses/<int:course_id>/', StudentEnrolledCourseDetailAPIView.as_view(), name='student-enrolled-course-detail'),
+    path('student/enrolled-courses/<int:course_id>/progress/', StudentCourseProgressAPIView.as_view(), name='student-course-progress'),
+    path('student/enrolled-courses/<int:course_id>/lessons/', StudentCourseLessonsAPIView.as_view(), name='student-course-lessons'),
+    path('student/enrolled-courses/<int:course_id>/modules/', StudentCourseModulesAPIView.as_view(), name='student-course-modules'),
 
+    # Upload
     path('path/upload/', FileUploadAPIView.as_view(), name='file-upload'),
 
-    path('list_by_level/', CoursesByLevelAPIView.as_view(), name='course-list-by-level'),
-
- 
-
-    # Teacher-specific courses
-
-    path('courses/teacher/<slug:slug>/', TeacherCoursesAPIView.as_view(), name='teacher-courses'),
-
-    path('courses/count/', TeacherCoursesAPIView.as_view(), name='teacher-courses-count'),
-
-    # List all enrollments with filtering
+    # Enrollment management (admin/receptionist)
     path('enrollments/', EnrollmentListAPIView.as_view(), name='enrollment-list'),
-    
-    # Get specific enrollment details
     path('enrollments/<int:id>/', EnrollmentDetailAPIView.as_view(), name='enrollment-detail'),
-    
-    # Create single enrollment
     path('enrollments/create/', EnrollmentCreateAPIView.as_view(), name='enrollment-create'),
-    
-    # Bulk enroll multiple students
     path('enrollments/bulk/', BulkEnrollmentCreateAPIView.as_view(), name='enrollment-bulk-create'),
-    
-    # Update enrollment (extend access, change status)
-    path('enrollments/<int:id>/update/', EnrollmentUpdateAPIView.as_view(), name='enrollment-update'),
-    
-    # Delete/revoke enrollment
-    path('enrollments/<int:id>/delete/', EnrollmentDestroyAPIView.as_view(), name='enrollment-delete'),
-    
-    # Get specific student's enrollments
-    path('students/<int:student_id>/enrollments/', StudentEnrollmentsAPIView.as_view(), name='student-enrollments'),
-    
-    # Get enrollments expiring soon
     path('enrollments/expiring/', EnrollmentExpiringAPIView.as_view(), name='enrollment-expiring'),
 
-
-    path('modules/create/', ModuleAPIView.as_view(), name='module-create'),   
-    
-    # Lesson creation
+    # Modules/Lessons
+    path('modules/create/', ModuleAPIView.as_view(), name='module-create'),
+    path('modules/<int:id>/', ModuleAPIView.as_view(), name='module-detail'),
     path('lessons/create/', LessonCreateAPIView.as_view(), name='lesson-create'),
-    
+    path('lessons/<int:id>/', LessonCreateAPIView.as_view(), name='lesson-detail'),
 
+    # Dashboard stats
+    path('dashboard/enrollment-stats/', EnrollmentDashboardStats.as_view(), name='enrollment-stats'),
+    path('dashboard/course-distribution/', CourseDistributionAPIView.as_view(), name='course-distribution'),
+    path('teacher/student-enrollments/', TeacherStudentEnrollmentListAPIView.as_view(), name='teacher-student-enrollments'),
+    path('teacher/dashboard/stats/', TeacherDashboardStatsAPIView.as_view(), name='teacher-dashboard-stats'),
+
+
+    path("teacher/assignments/", AssignmentListCreateAPIView.as_view()),
+    path("teacher/assignments/<int:pk>/", AssignmentDetailAPIView.as_view()),
+
+    path("teacher/quizzes/", QuizListCreateAPIView.as_view()),
+    path("teacher/quizzes/<int:pk>/", QuizDetailAPIView.as_view()),
+
+    path("teacher/quiz-questions/", QuizQuestionListCreateAPIView.as_view()),
+    path("teacher/quiz-questions/<int:pk>/", QuizQuestionDetailAPIView.as_view()),
+    path('student/dashboard/stats/', StudentDashboardStatsAPIView.as_view(), name='student-dashboard-stats'),
 ]
+

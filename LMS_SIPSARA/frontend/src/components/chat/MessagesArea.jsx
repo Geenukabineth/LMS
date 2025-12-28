@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { MessageCircle } from 'lucide-react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+import notificationConfig from "@/config/notification.config";
+
 
 const MessagesArea = ({ messages = [], selectedChat, currentUserId, onMarkAsRead }) => {
   const messagesEndRef = useRef(null);
@@ -22,9 +23,7 @@ const MessagesArea = ({ messages = [], selectedChat, currentUserId, onMarkAsRead
       if (unreadMessages.length > 0) {
         try {
           for (const msg of unreadMessages) {
-            await apiCall(API_ENDPOINTS.MARK_MESSAGE_READ(msg.id), {
-              method: 'POST',
-            });
+            await notificationConfig.MARK_MESSAGE_READ(msg.id);
           }
           onMarkAsRead?.();
         } catch (error) {

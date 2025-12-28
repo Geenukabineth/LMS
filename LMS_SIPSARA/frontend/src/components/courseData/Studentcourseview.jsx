@@ -30,7 +30,7 @@ import {
 
 const API_BASE_URL = 'http://localhost:8000/Course';
 
-console.log(`📡 API Base URL: ${API_BASE_URL}`);
+
 
 // ============================================================================
 // API SERVICE WITH CORRECT authService METHODS
@@ -49,7 +49,7 @@ const courseApiService = {
         throw new Error('No authentication token - Please login first');
       }
 
-      console.log(`🔐 Token found: ${token.substring(0, 20)}...`);
+      
 
       return {
         'Authorization': `Bearer ${token}`,
@@ -72,17 +72,17 @@ const courseApiService = {
       if (filters.search) params.append('search', filters.search);
 
       const url = `${API_BASE_URL}/student/enrolled-courses/?${params}`;
-      console.log(`📡 Fetching: ${url}`);
+      
 
       const headers = this.getAuthHeaders();
-      console.log(`🔐 Using auth headers with token`);
+     
 
       const response = await fetch(url, {
         method: 'GET',
         headers: headers,
       });
 
-      console.log(`📊 Response status: ${response.status}`);
+      
 
       if (response.status === 401) {
         console.error('❌ 401 Unauthorized - Token invalid or expired');
@@ -102,7 +102,7 @@ const courseApiService = {
       }
 
       const data = await response.json();
-      console.log(`✅ Raw API response:`, data);
+      
       return data;
     } catch (error) {
       console.error('❌ Exception in getEnrolledCourses:', error);
@@ -220,7 +220,7 @@ const courseApiService = {
 // ============================================================================
 
 const extractCoursesArray = (data) => {
-  console.log('🔍 Extracting courses from response...');
+ 
   
   // If it's already an array
   if (Array.isArray(data)) {
@@ -230,7 +230,7 @@ const extractCoursesArray = (data) => {
 
   // If it's an object with results key (DRF paginated format)
   if (data?.results && Array.isArray(data.results)) {
-    console.log('✅ Response is DRF paginated format with results key');
+    
     return data.results;
   }
 
@@ -279,7 +279,7 @@ const StudentCourseView = () => {
         }
         
         setEnrolledCourses(coursesArray);
-        console.log(`✅ Loaded ${coursesArray.length} courses`);
+        
       } catch (err) {
         console.error('❌ Error fetching courses:', err);
         setError(err.message || 'Failed to load courses. Please try again later.');
@@ -298,7 +298,7 @@ const StudentCourseView = () => {
 
   // Filter and search
   useEffect(() => {
-    console.log('🔄 Filtering courses...');
+    
     
     if (!Array.isArray(enrolledCourses)) {
       console.warn('⚠️ enrolledCourses is not an array');
@@ -461,7 +461,7 @@ const StudentCourseView = () => {
               const courseId = enrollment?.course_id || courseData?.id;
               
               // Debug logging
-              console.log(`Course: ${courseTitle}, ID: ${courseId}, enrollment.id: ${enrollment?.id}`);
+              
 
               return (
                 <div

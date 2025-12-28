@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Send, Paperclip } from 'lucide-react';
-import { API_ENDPOINTS, apiCall } from '@/config/apiConfig';
+import notificationConfig from "@/config/notification.config";
 
 const MessageInput = ({
   messageInput,
@@ -32,34 +32,27 @@ const MessageInput = ({
     setSending(true);
 
     try {
+      let response;
+      
       if (isGroup) {
-        // Send group message
-        const response = await apiCall(API_ENDPOINTS.GROUP_MESSAGES, {
-          method: 'POST',
-          body: JSON.stringify({
-            group_id: selectedChat.id,
-            content: messageInput,
-          }),
+        // ✅ FIX: Use the new SEND function and pass the DATA object
+        response = await notificationConfig.SEND_GROUP_MESSAGE({
+            group: selectedChat.id, // Backend expects 'group' ID
+            content: messageInput
         });
-
-        if (response) {
-          onSendMessage?.(response);
-          onInputChange('');
-        }
       } else {
-        // Send direct message
-        const response = await apiCall(API_ENDPOINTS.DIRECT_MESSAGES, {
-          method: 'POST',
-          body: JSON.stringify({
-            chat_id: selectedChat.id,
-            content: messageInput,
-          }),
+        // ✅ FIX: Use the new SEND function and pass the DATA object
+        response = await notificationConfig.SEND_DIRECT_MESSAGE({
+            chat: selectedChat.id, // Backend expects 'chat' ID
+            content: messageInput
         });
+      }
 
-        if (response) {
-          onSendMessage?.(response);
-          onInputChange('');
-        }
+      if (response) {
+        // Add flag to show it's from current user immediately
+        const msgWithSender = { ...response, is_sender: true };
+        onSendMessage?.(msgWithSender);
+        onInputChange('');
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -79,6 +72,7 @@ const MessageInput = ({
     }
   };
 
+  // ... (Return JSX remains the same) ...
   return (
     <div className="flex items-center p-4 space-x-3 bg-white border-t border-gray-200">
       <button

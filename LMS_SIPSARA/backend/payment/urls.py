@@ -30,6 +30,7 @@ from .views import (
     # Transactions
     TransactionListAPIView,
     TransactionDetailAPIView,
+    TeacherTransactionListAPIView,
     
     # Legacy endpoints (deprecated)
     CreateCardTokenView,
@@ -37,6 +38,7 @@ from .views import (
 
     AdminPaymentListAPIView,
     RecordPaymentView,
+    FinancialStatsAPI,
 )
 
 app_name = 'payment'
@@ -48,6 +50,7 @@ urlpatterns = [
     # =========================
     path('payments/process/', CreatePaymentIntentView.as_view(), name='process-payment'),
     path('payments/list/view/', paymentlistview.as_view(), name='confirm-payment'),
+    path('dashboard/financial-stats/', FinancialStatsAPI.as_view(), name='financial-stats'),
     
     # =========================
     # STRIPE PAYMENT INTENTS (MODERN & RECOMMENDED)
@@ -63,10 +66,7 @@ urlpatterns = [
     # =========================
     path('pay/gateways/', PaymentGatewayListAPIView.as_view(), name='gateway-list'),
     
-    # =========================
-    # CART MANAGEMENT - CRITICAL: SPECIFIC ROUTES FIRST!
-    # Must come BEFORE the generic <str:id> route
-    # Otherwise 'add' and 'clear' get captured as 'id' parameter
+   
     # =========================
     path('cart/add/', CartCreateAPIView.as_view(), name='cart-add'),
     path('cart/clear/', CartClearAPIView.as_view(), name='cart-clear'),
@@ -99,10 +99,13 @@ urlpatterns = [
 
 
     # admin payment view
-    path('admin/summary/', AdminPaymentListAPIView.as_view(), name='admin-transactions'),
+    
     path('payment-records/', AdminPaymentListAPIView.as_view(), name='payment-records'),
-
     path('record-payment/', RecordPaymentView.as_view(), name='record-payment'),
+
+
+    path('teacher/transactions/', TeacherTransactionListAPIView.as_view(), name='teacher-transactions'),
+    path('teacher/transactions/<str:teacher_id>/', TeacherTransactionListAPIView.as_view(), name='teacher-transaction-detail'),
      
     
 ]

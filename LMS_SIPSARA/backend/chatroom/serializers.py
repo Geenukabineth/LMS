@@ -309,22 +309,26 @@ class GroupMessageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'timestamp']
 
 
+# chat/serializers.py
+
 class GroupSerializer(serializers.ModelSerializer):
     """Serializer for Group model"""
     admin = UserMinimalSerializer(read_only=True)
     members = UserMinimalSerializer(many=True, read_only=True)
-    member_count = serializers.IntegerField(source='member_count', read_only=True)
-    is_admin = serializers.SerializerMethodField()
-    is_member = serializers.SerializerMethodField()
+    
+    # ❌ OLD ERROR LINE:
+    # member_count = serializers.IntegerField(source='member_count', read_only=True)
+    
+    # ✅ NEW CORRECT LINE: (Remove source='member_count')
+    member_count = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = Group
         fields = [
-            'id', 'name', 'description', 'admin', 'members',
-            'member_count', 'is_admin', 'is_member', 'group_image',
-            'created_at', 'updated_at'
+            'id', 'name', 'description', 'admin', 
+            'members', 'member_count', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'admin']
     
     def get_is_admin(self, obj):
         """Check if current user is admin"""
@@ -403,3 +407,74 @@ class UserOnlineStatusSerializer(serializers.ModelSerializer):
         model = UserOnlineStatus
         fields = ['id', 'user', 'is_online', 'last_seen']
         read_only_fields = ['id', 'last_seen']
+
+
+
+class UserMinimalSerializer(serializers.ModelSerializer):
+    """
+    Minimal user serializer for nested use in other serializers
+    """
+    is_online = serializers.SerializerMethodField()
+    full_name = serializers.SerializerMethodField()
+    display_image = serializers.SerializerMethodField()
+    
+    # 👇 This 'Meta' class MUST be indented inside UserMinimalSerializer
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'user_type',
+            'is_online', 'full_name', 'display_image', 'date_joined'
+        ]
+        read_only_fields = ['id', 'date_joined']
+    
+    def get_full_name(self, obj):
+        """Get full name with fallback for Admins"""
+        # 1. Try Profile
+        try:
+            if hasattr(obj, 'profile') and obj.profile and obj.profile.full_name:
+                return obj.profile.full_name
+        except: pass
+        
+        # 2. Try Student
+        try:
+            if hasattr(obj, 'student') and obj.student:
+                return f"{obj.student.firstName} {obj.student.lastName}".strip()
+        except: pass
+        
+        # 3. Try Teacher
+        try:
+            if hasattr(obj, 'teacher') and obj.teacher:
+                return f"{obj.teacher.First_Name} {obj.teacher.Last_Name}".strip()
+        except: pass
+        
+        # 4. Try Receptionist
+        try:
+            if hasattr(obj, 'receptionist') and obj.receptionist:
+                return f"{obj.receptionist.First_Name} {obj.receptionist.Last_Name}".strip()
+        except: pass
+
+        # 5. Fallback to username (Covers Admins/Superusers)
+        return obj.username
+    
+    def get_is_online(self, obj):
+        """Check if user is online"""
+        try:
+            return obj.online_status.is_online
+        except (AttributeError, UserOnlineStatus.DoesNotExist):
+            return False
+    
+    def get_display_image(self, obj):
+        """Get user image with fallback"""
+        # Try student image
+        try:
+            if hasattr(obj, 'student') and obj.student and obj.student.image:
+                return obj.student.image.url
+        except: pass
+        
+        # Try profile image
+        try:
+            if hasattr(obj, 'profile') and obj.profile and obj.profile.image:
+                return obj.profile.image.url
+        except: pass
+        
+        return None

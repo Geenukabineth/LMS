@@ -17,10 +17,11 @@ except ImportError:
     class EnrolledCourse: pass
 
 
-def generate_dummy_password(length=12):
-    """Generate a secure random password."""
-    characters = string.ascii_letters + string.digits + string.punctuation
+def generate_dummy_password(length=10):
+    """Generate a random password (safe to copy/paste)"""
+    characters = string.ascii_letters + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
+
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -401,6 +402,40 @@ class ReceptionistSerializer(serializers.ModelSerializer):
             Phone_Number=receptionist_data.get('Phone_Number', ""),
             gender=receptionist_data.get('gender', ""),
         )
+        from .utils.email import send_email
+
+        temporary_password = password or generate_dummy_password()
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=temporary_password,
+            user_type=User.RECEPTIONIST,
+            phone=receptionist_data.get("Phone_Number", ""),
+            is_temporary_password=True
+        )
+
+        Receptionist.objects.create(
+            user=user,
+            First_Name=receptionist_data.get('First_Name'),
+            Last_Name=receptionist_data.get('Last_Name'),
+            Email_Address=email,
+            Phone_Number=receptionist_data.get('Phone_Number', ""),
+            gender=receptionist_data.get('gender', ""),
+        )
+
+        send_email(
+            to_email=email,
+            subject="Your Receptionist Account Has Been Created",
+            template_name="emails/password_reset_confirmation.html",
+            context={
+                "username": user.username,
+                "temporary_password": temporary_password,
+            }
+        )
+
+       
+
 
         return user
 class ReceptionistListSerializer(serializers.ModelSerializer):

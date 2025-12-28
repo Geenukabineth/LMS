@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// import axios from 'axios'; // Not currently used directly if using paymentService
+import { paymentService } from '@/config/payment.config';
 
 const TeacherPaymentPage = () => {
   const [payments, setPayments] = useState([]);
@@ -15,14 +16,22 @@ const TeacherPaymentPage = () => {
 
   const fetchPayments = async () => {
     try {
-      setLoading(true);
-      const token = localStorage.getItem('access_token');
-      const response = await axios.get('http://localhost:8000/payment/payments/teacher/', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setPayments(response.data);
+      const data = await paymentService.getTeacherPayments();
+      
+      const formattedData = Array.isArray(data) ? data.map(item => ({
+        id: item.id,
+        transaction_id: item.enrollment_id ? String(item.enrollment_id) : 'N/A', 
+       
+        date_paid: item.started_at,
+        course_name: item.course_title || 'Unknown Course',
+        
+        student_name: item.student_name || 'Unknown Student',
+        student_email: item.student_email || '',
+        amount: item.amount ? parseFloat(item.amount) : 0.00,
+        status: item.status || 'Successful', 
+      })) : [];
+
+      setPayments(formattedData);
       setError(null);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load payments');
@@ -37,10 +46,12 @@ const TeacherPaymentPage = () => {
       if (filterStatus !== 'all' && payment.status !== filterStatus) {
         return false;
       }
+      const searchLower = searchTerm.toLowerCase();
       if (
         searchTerm &&
-        !payment.course_name?.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !payment.transaction_id?.toLowerCase().includes(searchTerm.toLowerCase())
+        !payment.course_name?.toLowerCase().includes(searchLower) &&
+        !payment.transaction_id?.toLowerCase().includes(searchLower) &&
+        !payment.student_name?.toLowerCase().includes(searchLower) // ✅ Allow search by student
       ) {
         return false;
       }
@@ -56,12 +67,12 @@ const TeacherPaymentPage = () => {
     });
 
   const totalAmount = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  const completedPayments = filteredPayments.filter((p) => p.status === 'completed').length;
+  const SuccessfulPayments = filteredPayments.filter((p) => p.status === 'Successful').length;
   const pendingPayments = filteredPayments.filter((p) => p.status === 'pending').length;
 
   const getStatusBadge = (status) => {
     const statusColors = {
-      completed: 'bg-green-100 text-green-800',
+      Successful: 'bg-green-100 text-green-800',
       pending: 'bg-yellow-100 text-yellow-800',
       failed: 'bg-red-100 text-red-800',
     };
@@ -103,7 +114,7 @@ const TeacherPaymentPage = () => {
         {/* Header */}
         <div className="pb-6 mb-8 border-b-2 border-gray-200">
           <h1 className="mb-2 text-4xl font-bold text-gray-900">Payment History</h1>
-          <p className="text-sm text-gray-600">View and manage your payment details</p>
+          <p className="text-sm text-gray-600">View student enrollments and transactions</p>
         </div>
 
         {/* Error Alert */}
@@ -118,7 +129,7 @@ const TeacherPaymentPage = () => {
         <div className="grid grid-cols-1 gap-4 mb-8 md:grid-cols-3">
           <div className="p-6 transition-shadow bg-white rounded-lg shadow hover:shadow-lg">
             <div className="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-              Total Received
+              Total Revenue
             </div>
             <div className="text-3xl font-bold text-gray-900">
               ${totalAmount.toFixed(2)}
@@ -126,13 +137,13 @@ const TeacherPaymentPage = () => {
           </div>
           <div className="p-6 transition-shadow bg-white rounded-lg shadow hover:shadow-lg">
             <div className="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-              Completed Payments
+              Successful Transactions
             </div>
-            <div className="text-3xl font-bold text-gray-900">{completedPayments}</div>
+            <div className="text-3xl font-bold text-gray-900">{SuccessfulPayments}</div>
           </div>
           <div className="p-6 transition-shadow bg-white rounded-lg shadow hover:shadow-lg">
             <div className="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-              Pending Payments
+              Pending
             </div>
             <div className="text-3xl font-bold text-amber-500">{pendingPayments}</div>
           </div>
@@ -143,7 +154,7 @@ const TeacherPaymentPage = () => {
           <div className="flex-1 min-w-0">
             <input
               type="text"
-              placeholder="Search by course or transaction ID..."
+              placeholder="Search by student, course or transaction ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-4 py-2 text-sm transition border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -157,7 +168,7 @@ const TeacherPaymentPage = () => {
               className="px-4 py-2 text-sm transition bg-white border border-gray-300 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="all">All Status</option>
-              <option value="completed">Completed</option>
+              <option value="Successful">Successful</option>
               <option value="pending">Pending</option>
               <option value="failed">Failed</option>
             </select>
@@ -184,11 +195,11 @@ const TeacherPaymentPage = () => {
         {filteredPayments.length === 0 ? (
           <div className="p-12 text-center bg-white rounded-lg shadow">
             <div className="mb-4 text-5xl">📭</div>
-            <h2 className="mb-2 text-xl font-semibold text-gray-900">No payments found</h2>
+            <h2 className="mb-2 text-xl font-semibold text-gray-900">No records found</h2>
             <p className="text-sm text-gray-600">
               {payments.length === 0
-                ? "You haven't received any payments yet."
-                : 'No payments match your current filters.'}
+                ? "No enrollments or transactions found."
+                : 'No records match your current filters.'}
             </p>
           </div>
         ) : (
@@ -200,6 +211,10 @@ const TeacherPaymentPage = () => {
                   <tr>
                     <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
                       Date
+                    </th>
+                    {/* ✅ New Column: Student */}
+                    <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
+                      Student
                     </th>
                     <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
                       Course
@@ -237,10 +252,22 @@ const TeacherPaymentPage = () => {
                           day: 'numeric',
                         })}
                       </td>
+                      
+                      {/* ✅ Display Student Name & Email */}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {payment.student_name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {payment.student_email}
+                          </span>
+                        </div>
+                      </td>
+
                       <td className="px-6 py-4">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{payment.course_name}</p>
-                          <p className="text-xs text-gray-500">{payment.course_code}</p>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-green-600">

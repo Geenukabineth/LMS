@@ -154,7 +154,7 @@ class Question_Answer_MessageAdmin(admin.ModelAdmin):
     list_display = ('course', 'question', 'user', 'date')
     list_filter = ('course', 'question', 'date')
     search_fields = ('message', 'user__username')
-    readonly_fields = ('qam_id', 'qa_id', 'date')
+    readonly_fields = ('qam_id',  'date')
 
 
 @admin.register(Certificate)
@@ -175,20 +175,44 @@ class EnrolledCourseAdmin(admin.ModelAdmin):
 
 @admin.register(Assignment)
 class AssignmentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'course', 'user', 'due_date', 'grade')
-    list_filter = ('course', 'due_date', 'grade')
-    search_fields = ('title', 'user__username', 'course__title')
-    readonly_fields = ('submitted_at',)
-    fieldsets = (
-        ('Assignment Details', {
-            'fields': ('title', 'description', 'course', 'due_date')
-        }),
-        ('Student Submission', {
-            'fields': ('user', 'file', 'submitted_at'),
-            'classes': ('collapse',)
-        }),
-        ('Grading', {
-            'fields': ('grade', 'feedback'),
-            'classes': ('collapse',)
-        }),
-    )
+    """
+    Safe admin that won't crash if your Assignment fields differ.
+    It auto-falls back to fields that actually exist on the model.
+    """
+
+    def _has(self, name: str) -> bool:
+        return any(f.name == name for f in self.model._meta.get_fields())
+
+    def get_list_display(self, request):
+        # show common fields only if they exist
+        base = ["id"]
+        for f in ["title", "course", "lesson", "module", "user", "due_date", "submitted_at", "grade", "date", "created_at"]:
+            if self._has(f):
+                base.append(f)
+        return tuple(base)
+
+    def get_list_filter(self, request):
+        filters = []
+        for f in ["course", "lesson", "due_date", "grade", "submitted_at", "date", "created_at"]:
+            if self._has(f):
+                filters.append(f)
+        return tuple(filters)
+
+    def get_search_fields(self, request):
+        s = []
+        if self._has("title"):
+            s.append("title")
+        if self._has("description"):
+            s.append("description")
+        if self._has("user"):
+            s += ["user__username", "user__email"]
+        if self._has("course"):
+            s += ["course__title"]
+        return tuple(s)
+
+    def get_readonly_fields(self, request, obj=None):
+        ro = []
+        for f in ["submitted_at", "date", "created_at", "updated_at"]:
+            if self._has(f):
+                ro.append(f)
+        return tuple(ro)

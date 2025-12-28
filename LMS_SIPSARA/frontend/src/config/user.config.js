@@ -63,6 +63,51 @@ export const userService = {
     return data;
   },
 
+  getuseractivity: async () => {
+    const { data } = await api.get('lms/dashboard/user-activity/');
+    return data?.activities ?? [];
+  },
+
+ getUserProfile: async () => {
+  try {
+    const { data } = await api.get("/lms/user/me/");
+    return data; // ✅ return full user object
+  } catch (error) {
+    console.error("Failed to fetch user profile:", error);
+    throw error;
+  }
+},
+
+  getUser: async (id) => {
+    const { data } = await api.get(`lms/user/${id}/`);
+    return data;
+  },
+  getUserList: async () => {
+    const { data } = await api.get('lms/user/');
+    return data?.users ?? [];
+  },
+  USER_SEARCH : async (params = {}) => {
+          const response = await api.get('lms/user/', { params });
+          return response.data;
+  },
+
+
+  getteachercoursestudents: async () => {
+    const { data } = await api.get(`Course/teacher/courses/`);    
+   
+    if (data?.results && Array.isArray(data.results)) {
+        // Use reduce to sum up the student_count from every course object
+        const totalStudents = data.results.reduce((sum, course) => {
+            return sum + (course.student_count || 0);
+        }, 0);
+        
+        return totalStudents;
+    }    
+    return 0; 
+}
+
+
+
 
 
 };
