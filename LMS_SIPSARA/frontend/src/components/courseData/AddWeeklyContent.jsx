@@ -331,6 +331,7 @@ const AddWeeklyContent = ({ courseId, onBack }) => {
     // If file upload
     if (lesson.uploadType === "file" && lesson.file) {
       fd.append("file", lesson.file);
+      fd.append("content_url_or_text", "");
     } else {
       fd.append("content_url_or_text", lesson.content_url_or_text || "");
     }

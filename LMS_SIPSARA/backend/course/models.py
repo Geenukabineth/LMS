@@ -167,8 +167,9 @@ class Lesson(models.Model):
     title = models.CharField(max_length=255)
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPE)
     order = models.IntegerField(default=0, help_text="The sequence number for the lesson within the module.")
-    content_url_or_text = models.TextField(help_text="File URL or long text content.")
+    content_url_or_text = models.TextField(blank=True, null=True)
     duration_minutes = models.IntegerField(null=True, blank=True, help_text="Estimated time for quiz/video duration.")
+    document = models.FileField(upload_to="lesson-documents/", blank=True, null=True)
     lesson_id = ShortUUIDField(unique=True, length=8, max_length=20, alphabet="1234567890")
     date = models.DateTimeField(default=timezone.now)
 

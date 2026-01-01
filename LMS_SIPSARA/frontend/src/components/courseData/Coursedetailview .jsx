@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+
 import authService from '@/context/authService';
 import {
   ArrowLeft,
@@ -26,8 +27,6 @@ import {
 // ============================================================================
 
 const API_BASE_URL = 'http://localhost:8000/Course';
-
-
 
 const courseApiService = {
   getAuthHeaders() {
@@ -162,6 +161,7 @@ const CourseDetailView = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedModule, setExpandedModule] = useState(null);
+  const [selectedLesson, setSelectedLesson] = useState(null);
 
   // ✅ FIX: Fetch course details with better error handling
   useEffect(() => {
@@ -525,7 +525,35 @@ const CourseDetailView = () => {
                               module.lessons.map((lesson, lessonIndex) => (
                                 <div
                                   key={lesson.id || lessonIndex}
-                                  className="flex items-center gap-3 p-3 rounded-lg bg-gray-50"
+                                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-100 ${
+                                    selectedLesson?.id === lesson.id ? 'ring-2 ring-blue-300' : 'bg-gray-50'
+                                  }`}
+                                  onClick={() => {
+                                    const type = lesson.content_type?.toLowerCase();
+
+                                    // 1. Handle Document
+                                    if (type === "document") {
+                                      const docPath = lesson.document || lesson.content_url_or_text;
+                                      if (docPath) {
+                                        const url = docPath.startsWith("http")
+                                          ? docPath
+                                          : `http://localhost:8000${docPath}`;
+                                        window.open(url, "_blank", "noopener,noreferrer");
+                                      }
+                                    } 
+                                    // 2. Handle Quiz
+                                    else if (type === "quiz") {
+                                      navigate(`/student/course/${courseId}/quiz/${lesson.id}`);
+                                    }
+                                    // 3. Handle Assignment (NEW)
+                                    else if (type === "assignment") {
+                                      navigate(`/student/course/${courseId}/assignment/${lesson.id}`);
+                                    }
+                                    // 4. Handle Video/Other
+                                    else {
+                                      setSelectedLesson(lesson);
+                                    }
+                                  }}
                                 >
                                   {lesson.completed ? (
                                     <CheckCircle2 className="flex-shrink-0 w-5 h-5 text-green-500" />
@@ -601,26 +629,6 @@ const CourseDetailView = () => {
                   ? 'You have full access to this course.' 
                   : 'Your access to this course has expired. Please renew to continue learning.'}
               </p>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
-              <h3 className="mb-4 font-bold text-gray-900">Quick Actions</h3>
-              <div className="space-y-3">
-                <button className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${
-                  hasAccess
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                }`}
-                disabled={!hasAccess}
-                >
-                  <Play className="w-5 h-5" />
-                  Continue Learning
-                </button>
-                <button className="w-full py-3 font-semibold text-gray-700 transition-colors border-2 border-gray-300 rounded-lg hover:bg-gray-50">
-                  Download Certificate
-                </button>
-              </div>
             </div>
 
             {/* Course Info Card */}

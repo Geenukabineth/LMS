@@ -896,16 +896,16 @@ class LessonCreateAPIView(CreateAPIView):
         if not request.user.is_staff and module.course.teacher.user != request.user:
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-        data = request.data.copy()
-
-        # If you upload a file, put its path into content_url_or_text
-        if 'file' in request.FILES:
-            data['content_url_or_text'] = f"/media/{request.FILES['file'].name}"
-
-        serializer = self.get_serializer(data=data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        if "file" in request.FILES:
+            lesson = serializer.save(document=request.FILES["file"])
+        else:
+            lesson = serializer.save()
+
+        return Response(self.get_serializer(lesson).data, status=status.HTTP_201_CREATED)
+
     
 
 

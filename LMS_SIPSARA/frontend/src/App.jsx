@@ -11,6 +11,8 @@ import ProtectedRouter from "@/config/ProtectedRouter";
 import ForgotPassword from "@/components/pages/forgot-password/ForgotPassword";
 import TeacherApplication from "@/components/pages/TeacherApplication";
 import CourseDetailView from "@/components/courseData/Coursedetailview ";
+import QuizAttemptView from "@/components/student/QuizAttemptView";
+import AssignmentView from "@/components/student/AssignmentView";
 
 
 function App() {
@@ -40,12 +42,20 @@ function App() {
       <Route element={<ProtectedRouter allowedRoles={['student']} />}>
         <Route path="/student" element={<Student />} />
         <Route path="/student/courses/:id" element={<CourseDetailView />} />
+        <Route path="/courses" element={<CourseBrowsePage />} />
       </Route>
 
       {/* ✅ FIX: Route Group 4 - Receptionist Access */}
       <Route element={<ProtectedRouter allowedRoles={['receptionist']} />}>
         <Route path="/receptionist" element={<Receptionist />} />
       </Route>
+      <Route element={<ProtectedRouter allowedRoles={['student']} />}>
+        <Route path="/student/course/:courseId/quiz/:quizId" element={<QuizAttemptView />} />
+      </Route>
+      <Route element={<ProtectedRouter allowedRoles={['student']} />}>
+        <Route path="/student/course/:courseId/assignment/:assignmentId" element={<AssignmentView />} />
+      </Route>
+
       {/* ---------------------------------------------------- */}
       
     </Routes>
