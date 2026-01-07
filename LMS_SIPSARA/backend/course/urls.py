@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     AssignmentDetailAPIView,
+    GradeSubmissionAPIView,
     QuizDetailAPIView,
     QuizListCreateAPIView,
     QuizQuestionDetailAPIView,
@@ -32,10 +33,13 @@ from .views import (
     LessonCreateAPIView,
     EnrollmentDashboardStats,
     CourseDistributionAPIView,
+    TeacherGradingListAPIView,
     TeacherStudentEnrollmentListAPIView,
     TeacherDashboardStatsAPIView,
     AssignmentListCreateAPIView,
     StudentDashboardStatsAPIView,
+    SubmitAssignmentAPIView,
+    SubmitQuizAPIView,
 )
 
 urlpatterns = [
@@ -114,9 +118,15 @@ urlpatterns = [
 
     path("teacher/quizzes/", QuizListCreateAPIView.as_view()),
     path("teacher/quizzes/<int:pk>/", QuizDetailAPIView.as_view()),
+    path('student/assignment/submit/', SubmitAssignmentAPIView.as_view(), name='submit-assignment'),
+    path('student/quiz/submit/', SubmitQuizAPIView.as_view(), name='submit-quiz'),
+    path('teacher/submissions/', TeacherGradingListAPIView.as_view(), name='teacher-submissions'),
+    path('teacher/grade/assignment/<int:pk>/', GradeSubmissionAPIView.as_view(), name='grade-assignment'),
 
     path("teacher/quiz-questions/", QuizQuestionListCreateAPIView.as_view()),
     path("teacher/quiz-questions/<int:pk>/", QuizQuestionDetailAPIView.as_view()),
     path('student/dashboard/stats/', StudentDashboardStatsAPIView.as_view(), name='student-dashboard-stats'),
+
+
 ]
 

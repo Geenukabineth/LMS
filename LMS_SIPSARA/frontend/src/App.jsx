@@ -54,6 +54,7 @@ function App() {
       </Route>
       <Route element={<ProtectedRouter allowedRoles={['student']} />}>
         <Route path="/student/course/:courseId/assignment/:assignmentId" element={<AssignmentView />} />
+        
       </Route>
 
       {/* ---------------------------------------------------- */}

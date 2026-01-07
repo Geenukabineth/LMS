@@ -1,150 +1,161 @@
-import React, { useState } from 'react';
+// components/AssignmentView.jsx
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  UploadCloud, 
-  FileText, 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle 
-} from 'lucide-react';
+import { ArrowLeft, UploadCloud, Calendar, AlertCircle, Loader } from 'lucide-react';
+import { courseService } from "@/config/course.config";
 
 const AssignmentView = () => {
-  const { assignmentId } = useParams();
+  const params = useParams();
+  // This 'id' is likely the LESSON ID (e.g., 325) coming from the URL
+  const id = params.assignmentId || params.id || params.pk; 
+  const { courseId } = useParams(); 
+
   const navigate = useNavigate();
-
-  // Mock Data
-  const [assignmentData, setAssignmentData] = useState({
-    title: "Project: Build a React Component",
-    description: "Create a reusable button component that accepts props for color, size, and onClick behavior. Upload your .jsx file below.",
-    due_date: "2024-12-31",
-    points: 100,
-    status: "pending" // pending, submitted, graded
-  });
-
+  const [assignment, setAssignment] = useState(null);
   const [file, setFile] = useState(null);
-  const [comment, setComment] = useState("");
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+  useEffect(() => {
+    if (!id) {
+        setError("Invalid ID provided.");
+        setLoading(false);
+        return;
+    }
+
+    const fetchAssignment = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        
+        // -----------------------------------------------------------
+        // 1. SMART LOOKUP: Try finding by LESSON ID first
+        // -----------------------------------------------------------
+        // This calls: /teacher/assignments/?lesson=325
+        const listResponse = await courseService.getAssignments(id);
+        
+        if (Array.isArray(listResponse) && listResponse.length > 0) {
+            // Found it! Use the first assignment from the list
+            // This transforms Lesson ID (325) -> Assignment Data (ID: 1)
+            setAssignment(listResponse[0]);
+        } else {
+            // -----------------------------------------------------------
+            // 2. FALLBACK: Try finding by ASSIGNMENT ID
+            // -----------------------------------------------------------
+            // If the list was empty, maybe 'id' was already the Assignment ID?
+            // This calls: /teacher/assignments/325/
+            try {
+                const detailResponse = await courseService.getAssignmentDetail(id);
+                setAssignment(detailResponse);
+            } catch (detailErr) {
+                // If both fail, then it truly doesn't exist
+                throw new Error("Assignment not found");
+            }
+        }
+      } catch (err) {
+          console.error("Failed to load assignment", err);
+          setError("Assignment not found. Please contact your instructor.");
+      } finally {
+          setLoading(false);
+      }
+    };
+
+    fetchAssignment();
+  }, [id]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!file || !assignment) return;
+    
+    setSubmitting(true);
+    const formData = new FormData();
+    // ✅ CRITICAL: Use the REAL Assignment ID from the fetched object (e.g., 1)
+    formData.append("assignment", assignment.id);
+    formData.append("file", file);
+
+    try {
+      await courseService.submitAssignment(formData);
+      alert("Submitted successfully!");
+      navigate(`/student/course/${courseId}`); 
+    } catch (error) {
+      console.error(error);
+      alert("Submission failed. Please check your network.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // API call logic would go here
-    setIsSubmitted(true);
-  };
+  if (loading) return (
+      <div className="flex items-center justify-center h-64">
+          <Loader className="w-8 h-8 text-blue-600 animate-spin" />
+      </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center p-8 m-4 text-red-600 rounded-lg bg-red-50">
+        <AlertCircle className="w-10 h-10 mb-2"/>
+        <p className="font-semibold">{error}</p>
+        <button onClick={() => navigate(-1)} className="mt-4 text-blue-600 underline hover:text-blue-800">
+            Go Back to Course
+        </button>
+    </div>
+  );
+
+  if (!assignment) return null;
 
   return (
-    <div className="min-h-screen p-6 bg-gray-50">
-      <div className="max-w-3xl mx-auto">
-        
-        {/* Header */}
+    <div className="max-w-3xl p-6 mx-auto mt-8 bg-white border border-gray-100 shadow-lg rounded-xl">
         <button 
-          onClick={() => navigate(-1)} 
-          className="flex items-center gap-2 mb-6 text-gray-600 hover:text-blue-600"
+            onClick={() => navigate(-1)} 
+            className="flex items-center mb-6 text-gray-500 transition hover:text-blue-600 group"
         >
-          <ArrowLeft className="w-5 h-5" /> Back to Course
+            <ArrowLeft size={18} className="mr-1 transition-transform group-hover:-translate-x-1"/> 
+            Back to Course
         </button>
 
-        <div className="grid gap-6">
-          
-          {/* Assignment Details Card */}
-          <div className="p-8 bg-white border border-gray-200 shadow-sm rounded-xl">
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h1 className="mb-2 text-2xl font-bold text-gray-900">{assignmentData.title}</h1>
-                <div className="flex gap-4 text-sm text-gray-500">
-                  <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> Due: {assignmentData.due_date}</span>
-                  <span className="flex items-center gap-1"><AlertCircle className="w-4 h-4" /> {assignmentData.points} Points</span>
+        <div className="pb-4 mb-6 border-b">
+            <h1 className="text-3xl font-bold text-gray-900">{assignment.title}</h1>
+            {assignment.due_date && (
+                <div className="flex items-center mt-2 text-sm font-medium text-gray-500">
+                    <Calendar className="inline w-4 h-4 mr-2 text-blue-500"/> 
+                    Due: {new Date(assignment.due_date).toLocaleDateString()}
                 </div>
-              </div>
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${isSubmitted ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                {isSubmitted ? 'Submitted' : 'Pending'}
-              </div>
-            </div>
-            
-            <div className="prose text-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900">Instructions</h3>
-              <p>{assignmentData.description}</p>
-            </div>
-          </div>
-
-          {/* Submission Card */}
-          <div className="p-8 bg-white border border-gray-200 shadow-sm rounded-xl">
-            <h2 className="mb-6 text-xl font-bold text-gray-900">Your Submission</h2>
-            
-            {isSubmitted ? (
-              <div className="py-8 text-center">
-                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full">
-                  <CheckCircle2 className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900">Assignment Submitted!</h3>
-                <p className="mb-6 text-gray-500">Submitted on {new Date().toLocaleDateString()}</p>
-                <button 
-                  onClick={() => navigate(-1)}
-                  className="px-6 py-2 font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Return to Course
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                
-                {/* File Upload Area */}
-                <div className="relative p-8 text-center transition-colors border-2 border-gray-300 border-dashed rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50">
-                  <input 
-                    type="file" 
-                    onChange={handleFileChange} 
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <UploadCloud className="w-10 h-10 mx-auto mb-3 text-gray-400" />
-                  {file ? (
-                    <div>
-                      <p className="font-medium text-blue-600">{file.name}</p>
-                      <p className="text-sm text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="font-medium text-gray-700">Click to upload or drag and drop</p>
-                      <p className="text-sm text-gray-500">PDF, DOCX, ZIP up to 10MB</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Comments */}
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">Additional Comments</label>
-                  <textarea 
-                    rows="4"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Add any notes for your instructor..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={!file}
-                  className={`w-full py-3 rounded-lg font-semibold text-white transition-colors ${
-                    file ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'
-                  }`}
-                >
-                  Submit Assignment
-                </button>
-              </form>
             )}
-          </div>
-
         </div>
-      </div>
+
+        <div className="p-6 mb-8 text-gray-700 whitespace-pre-wrap border border-gray-100 rounded-lg bg-gray-50">
+            <h3 className="mb-2 text-sm font-bold text-gray-400 uppercase">Instructions</h3>
+            {assignment.description || "No instructions provided."}
+        </div>
+        
+        <div className="p-8 text-center transition-all border-2 border-gray-300 border-dashed rounded-xl bg-gray-50 hover:bg-blue-50 hover:border-blue-400 group">
+            <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 transition-transform bg-white rounded-full shadow-sm group-hover:scale-110">
+                <UploadCloud className="w-8 h-8 text-blue-500"/>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">Upload Your Work</h3>
+            <p className="mb-6 text-sm text-gray-500">Supported formats: PDF, DOCX, ZIP</p>
+            
+            <input 
+                type="file" 
+                onChange={(e) => setFile(e.target.files[0])} 
+                className="block w-full max-w-xs mx-auto text-sm text-gray-500 cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" 
+            />
+            
+            <button 
+                onClick={handleSubmit} 
+                disabled={!file || submitting}
+                className={`w-full max-w-xs py-3 mt-8 font-bold rounded-lg transition-all shadow-md ${
+                    !file || submitting 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
+                }`}
+            >
+                {submitting ? "Uploading..." : "Submit Assignment"}
+            </button>
+        </div>
     </div>
   );
 };
 
-export default AssignmentView;  
+export default AssignmentView;

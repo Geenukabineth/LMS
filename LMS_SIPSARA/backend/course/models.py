@@ -445,6 +445,39 @@ class Assignment(models.Model):
 
     def __str__(self):
         return self.title
+    
+    # models.py (Append to existing file)
+
+# models.py (Updated bottom section)
+
+class AssignmentSubmission(models.Model):
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='submissions')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='submissions/', null=True, blank=True)
+    grade = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    feedback = models.TextField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('assignment', 'student')
+
+class QuizAttempt(models.Model):
+    # ✅ FIXED: Changed related_name to 'quiz_attempts' to avoid clash with Quiz.attempts integer field
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='quiz_attempts')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    score = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    passed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-completed_at']
+
+class QuizAttemptAnswer(models.Model):
+    attempt = models.ForeignKey(QuizAttempt, on_delete=models.CASCADE, related_name='answers')
+    question = models.ForeignKey(QuizQuestion, on_delete=models.CASCADE)
+    selected_option = models.CharField(max_length=255, null=True, blank=True) # For MCQ
+    text_answer = models.TextField(null=True, blank=True) # For written answers
+    is_correct = models.BooleanField(default=False)
 
 
 class LiveSession(models.Model):

@@ -1054,12 +1054,50 @@ class AssignmentListCreateAPIView(ListCreateAPIView):
         serializer.save()
 
 
+# backend/course/views.py
+
 class AssignmentDetailAPIView(RetrieveUpdateDestroyAPIView):
     serializer_class = AssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
     queryset = Assignment.objects.all()
 
+    def get_object(self):
+        # Get the ID from the URL (e.g., 325)
+        pk = self.kwargs.get('pk')
+        
+        # 1. Try to find the Assignment by its real ID
+        assignment = Assignment.objects.filter(pk=pk).first()
+        
+        # 2. If not found, assume the ID passed was a LESSON ID and try to find the assignment for that lesson
+        if not assignment:
+            assignment = get_object_or_404(Assignment, lesson_id=pk)
+            
+        # Check permissions (standard Django Rest Framework check)
+        self.check_object_permissions(self.request, assignment)
+        
+        return assignment
+
+
+class QuizDetailAPIView(RetrieveUpdateDestroyAPIView):
+    serializer_class = QuizSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Quiz.objects.all()
+
+    def get_object(self):
+        # Get the ID from the URL
+        pk = self.kwargs.get('pk')
+
+        # 1. Try to find the Quiz by its real ID
+        quiz = Quiz.objects.filter(pk=pk).first()
+
+        # 2. If not found, try to find the Quiz by the LESSON ID
+        if not quiz:
+            quiz = get_object_or_404(Quiz, lesson_id=pk)
+
+        self.check_object_permissions(self.request, quiz)
+        
+        return quiz
 
 class QuizListCreateAPIView(ListCreateAPIView):
     serializer_class = QuizSerializer
@@ -1079,10 +1117,6 @@ class QuizListCreateAPIView(ListCreateAPIView):
         serializer.save()
 
 
-class QuizDetailAPIView(RetrieveUpdateDestroyAPIView):
-    serializer_class = QuizSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    queryset = Quiz.objects.all()
 
 
 class QuizQuestionListCreateAPIView(ListCreateAPIView):
@@ -1113,7 +1147,7 @@ class QuizQuestionDetailAPIView(RetrieveUpdateDestroyAPIView):
 # course/views.py
 
 # ... existing imports ...
-from .models import CompletedLesson # Ensure this is imported
+from .models import CompletedLesson
 
 class StudentDashboardStatsAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1211,3 +1245,49 @@ class StudentDashboardStatsAPIView(APIView):
             "upcoming_quizzes": quizzes_data, # ✅ Return new data
             "todays_schedule": schedule_data
         })
+# views.py
+
+from .models import AssignmentSubmission, QuizAttempt, Student
+from .serializers import AssignmentSubmissionSerializer, QuizAttemptSerializer
+
+# --- Submission Views ---
+
+class SubmitAssignmentAPIView(CreateAPIView):
+    serializer_class = AssignmentSubmissionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def perform_create(self, serializer):
+        student = get_object_or_404(Student, user=self.request.user)
+        serializer.save(student=student)
+
+class SubmitQuizAPIView(CreateAPIView):
+    serializer_class = QuizAttemptSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        student = get_object_or_404(Student, user=self.request.user)
+        serializer.save(student=student)
+
+# --- Grading Views (Teacher) ---
+
+class TeacherGradingListAPIView(ListAPIView):
+    # Returns all submissions for a specific course or assignment
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # Filter by assignment_id if provided
+        assignment_id = request.query_params.get('assignment_id')
+        if assignment_id:
+             submissions = AssignmentSubmission.objects.filter(assignment_id=assignment_id)
+             return Response(AssignmentSubmissionSerializer(submissions, many=True).data)
+        return Response([])
+
+class GradeSubmissionAPIView(UpdateAPIView):
+    queryset = AssignmentSubmission.objects.all()
+    serializer_class = AssignmentSubmissionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_update(self, serializer):
+        # Allow teacher to update grade and feedback
+        serializer.save()

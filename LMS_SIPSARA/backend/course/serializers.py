@@ -3,7 +3,7 @@ from rest_framework import serializers
 from .models import (
     Course, EnrolledCourse, Variant, VariantItem,
     CompletedLesson, Note, Review, Question_Answer,
-    Question_Answer_Message, Module, Lesson, Assignment, Quiz, QuizQuestion
+    Question_Answer_Message, Module, Lesson, Assignment, Quiz, QuizQuestion,AssignmentSubmission, QuizAttempt, QuizAttemptAnswer
 )
 
 from lms.models import Teacher, Profile, Student
@@ -489,3 +489,63 @@ class QuizSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
         fields = "__all__"
+
+
+# serializers.py
+
+class AssignmentSubmissionSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.user.username', read_only=True)
+    
+    class Meta:
+        model = AssignmentSubmission
+        fields = ['id', 'assignment', 'student', 'student_name', 'file', 'grade', 'feedback', 'submitted_at']
+        read_only_fields = ['student', 'submitted_at']
+
+class QuizAttemptAnswerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuizAttemptAnswer
+        fields = ['question', 'selected_option', 'text_answer']
+
+class QuizAttemptSerializer(serializers.ModelSerializer):
+    answers = QuizAttemptAnswerSerializer(many=True, write_only=True)
+    student_name = serializers.CharField(source='student.user.username', read_only=True)
+
+    class Meta:
+        model = QuizAttempt
+        fields = ['id', 'quiz', 'student', 'student_name', 'score', 'passed', 'completed_at', 'answers']
+        read_only_fields = ['student', 'score', 'passed', 'completed_at']
+
+    def create(self, validated_data):
+        answers_data = validated_data.pop('answers')
+        attempt = QuizAttempt.objects.create(**validated_data)
+        
+        total_points = 0
+        earned_points = 0
+        
+        for ans_data in answers_data:
+            question = ans_data['question']
+            selected = ans_data.get('selected_option')
+            
+            # Auto-grading logic for MCQ
+            is_correct = False
+            if question.type == 'multiple_choice' or question.type == 'true_false':
+                if str(selected).lower() == str(question.correct_answer).lower():
+                    is_correct = True
+                    earned_points += question.points
+            
+            total_points += question.points
+            
+            QuizAttemptAnswer.objects.create(
+                attempt=attempt,
+                question=question,
+                selected_option=selected,
+                is_correct=is_correct
+            )
+        
+        # Calculate final score
+        if total_points > 0:
+            attempt.score = (earned_points / total_points) * 100
+        attempt.passed = attempt.score >= 50 # Example passing grade
+        attempt.save()
+        
+        return attempt

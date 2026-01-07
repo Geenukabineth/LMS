@@ -185,6 +185,87 @@ getStudentDashboardStats: async () => {
     return data;
   },
 
+  // --- Existing Methods ---
+  getCourseModules: async (courseId) => {
+    const response = await api.get(`Course/teacher/modules/${courseId}/`);
+    return response.data;
+  },
+  
+  createLesson: async (formData) => {
+    const response = await api.post("Course/lessons/create/", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+
+  // --- NEW: Assessment Creation (Teacher) ---
+  createAssignment: async (formData) => {
+    const response = await api.post("Course/teacher/assignments/", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+
+  createQuiz: async (data) => {
+    const response = await api.post("Course/teacher/quizzes/", data);
+    return response.data;
+  },
+
+  createQuizQuestion: async (data) => {
+    const response = await api.post("Course/teacher/quiz-questions/", data);
+    return response.data;
+  },
+
+  // --- NEW: Student Actions ---
+  getQuizDetail: async (quizId) => {
+    const response = await api.get(`Course/teacher/quizzes/${quizId}/`);
+    return response.data;
+  },
+
+  submitQuizAttempt: async (data) => {
+    const response = await api.post("Course/student/quiz/submit/", data);
+    return response.data;
+  },
+
+  getAssignmentDetail: async (assignmentId) => {
+    const response = await api.get(`Course/teacher/assignments/${assignmentId}/`);
+    return response.data;
+  },
+
+  submitAssignment: async (formData) => {
+    const response = await api.post("Course/student/assignment/submit/", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+
+  // --- NEW: Grading (Teacher) ---
+  getSubmissions: async (assignmentId) => {
+    const response = await api.get(`Course/teacher/submissions/?assignment_id=${assignmentId}`);
+    return response.data;
+  },
+
+  gradeSubmission: async (submissionId, data) => {
+    const response = await api.patch(`Course/teacher/grade/assignment/${submissionId}/`, data);
+    return response.data;
+  },
+getStudentCourseDetail: async (courseId) => {
+    // Matches: path('student/enrolled-courses/<int:course_id>/', ...)
+    const { data } = await api.get(`Course/student/enrolled-courses/${courseId}/`);
+    return data;
+  },
+
+  getStudentCourseModules: async (courseId) => {
+    // Matches: path('student/enrolled-courses/<int:course_id>/modules/', ...)
+    const { data } = await api.get(`Course/student/enrolled-courses/${courseId}/modules/`);
+    return data;
+  },
+
+  getStudentCourseProgress: async (courseId) => {
+    // Matches: path('student/enrolled-courses/<int:course_id>/progress/', ...)
+    const { data } = await api.get(`Course/student/enrolled-courses/${courseId}/progress/`);
+    return data;
+  },
  
 
 

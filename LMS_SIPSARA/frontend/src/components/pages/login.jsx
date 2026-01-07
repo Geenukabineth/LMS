@@ -37,8 +37,6 @@ function Login() {
       const data = await authService.login(credentials);
 
       if (data && data.access && data.refresh) {
-        // ✅ REMOVED: Redundant localStorage.setItem calls.
-        // Session data (tokens and user info) is now handled entirely within authService.login() -> setSession().
 
         setLoginSuccess(true);
 

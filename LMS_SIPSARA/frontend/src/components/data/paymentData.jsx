@@ -188,7 +188,7 @@ const AdminPaymentPanel = () => {
           />
           <StatsCard 
             title="Admin Revenue (30%)" 
-            value={`$${stats.adminRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
+            value={`Rs.${stats.adminRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
             icon={<TrendingUp size={24} className="text-purple-600" />} 
             bg="bg-purple-50"
           />
@@ -206,7 +206,7 @@ const AdminPaymentPanel = () => {
           />
           <StatsCard 
             title="Pending Amount" 
-            value={`$${stats.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
+            value={`Rs.${stats.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
             icon={<AlertCircle size={24} className="text-amber-600" />} 
             bg="bg-amber-50"
           />
@@ -299,7 +299,7 @@ const AdminPaymentPanel = () => {
                           <div className="text-xs text-gray-400 mt-0.5">{payment.email}</div>
                         </td>
                         <td className="px-6 py-4 align-top">
-                          <div className="text-sm font-bold text-gray-900">${payment.amount.toFixed(2)}</div>
+                          <div className="text-sm font-bold text-gray-900">Rs.{payment.amount.toFixed(2)}</div>
                         </td>
                         <td className="px-6 py-4 align-top">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
