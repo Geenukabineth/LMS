@@ -1,10 +1,7 @@
+import json
 from rest_framework import serializers
 
-from .models import (
-    Course, EnrolledCourse, Variant, VariantItem,
-    CompletedLesson, Note, Review, Question_Answer,
-    Question_Answer_Message, Module, Lesson, Assignment, Quiz, QuizQuestion,AssignmentSubmission, QuizAttempt, QuizAttemptAnswer
-)
+from .models import *
 
 from lms.models import Teacher, Profile, Student
 
@@ -12,7 +9,7 @@ from lms.models import Teacher, Profile, Student
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ['profile_id', 'full_name', 'image']
+        fields = ['id', 'full_name', 'image', 'email', 'phoneNumber']
 
 
 class TeacherCourseSerializer(serializers.ModelSerializer):
@@ -230,6 +227,8 @@ class EnrolledCourseSerializer(serializers.ModelSerializer):
 
     def get_has_access(self, obj):
         return obj.has_access()
+    
+    
 
 
 class StudentInfoSerializer(serializers.ModelSerializer):
@@ -253,6 +252,7 @@ class StudentInfoSerializer(serializers.ModelSerializer):
 
 class StudentEnrolledCoursesSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source='course.title', read_only=True)
+    title = serializers.CharField(source='course.title', read_only=True)
     course_id = serializers.IntegerField(source='course.id', read_only=True)
     course_level = serializers.CharField(source='course.level', read_only=True)
     course_image = serializers.SerializerMethodField(read_only=True)
@@ -281,6 +281,7 @@ class StudentEnrolledCoursesSerializer(serializers.ModelSerializer):
             'enrollment_id',
             'course_id',
             'course_title',
+            'title',
             'course_level',
             'course_image',
             'teacher_id',
@@ -429,10 +430,10 @@ class NoteSerializer(serializers.ModelSerializer):
 
 class ReviewSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)
-
     class Meta:
         model = Review
         fields = ['id', 'course', 'user', 'review', 'rating', 'reply', 'active', 'date', 'profile']
+        read_only_fields = ['id', 'course', 'user', 'reply', 'active', 'date', 'profile']
 
 
 class Question_Answer_MessageSerializer(serializers.ModelSerializer):
@@ -481,6 +482,20 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuizQuestion
         fields = "__all__"
+        # ✅ Fix: Parse 'options' if it comes as a string from FormData
+    def validate_options(self, value):
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except ValueError:
+                raise serializers.ValidationError("Invalid JSON format for options")
+        return value
+
+    # ✅ Fix: Ensure correct_answer is not sent as "undefined" string
+    def validate_correct_answer(self, value):
+        if value == "undefined" or value is None:
+            return ""
+        return value
 
 
 class QuizSerializer(serializers.ModelSerializer):
@@ -498,9 +513,10 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = AssignmentSubmission
-        fields = ['id', 'assignment', 'student', 'student_name', 'file', 'grade', 'feedback', 'submitted_at']
-        read_only_fields = ['student', 'submitted_at']
-
+        # ✅ Add 'plagiarism_score' to fields
+        fields = ['id', 'assignment', 'student', 'student_name', 'file', 'grade', 'feedback', 'plagiarism_score', 'submitted_at',]
+        # ✅ Add 'plagiarism_score' to read_only_fields (students shouldn't edit it)
+        read_only_fields = ['student', 'submitted_at', 'plagiarism_score']
 class QuizAttemptAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuizAttemptAnswer
@@ -549,3 +565,123 @@ class QuizAttemptSerializer(serializers.ModelSerializer):
         attempt.save()
         
         return attempt
+    
+class LiveSessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LiveSession
+        fields = ['id', 'title', 'date', 'time', 'duration', 'is_completed', 'join_url']
+
+class LiveAttendanceSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.user.username', read_only=True)
+    
+    class Meta:
+        model = LiveAttendance
+        fields = ['student_name', 'join_time', 'status']
+
+from rest_framework import serializers
+from .models import Complaint
+
+class ComplaintSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='user.username', read_only=True)
+    student_email = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = Complaint
+        fields = [
+            "id",
+            "user",
+            "student_name",
+            "student_email",
+            "course",
+            "send_to",
+            "teacher",
+            "title",
+            "description",
+            "priority",
+            "status",
+            "reply",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "user", "course", "teacher", "created_at", "updated_at"]
+
+class ComplaintUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Complaint
+        fields = ["title", "description", "priority", "status", "reply"]
+        read_only_fields = ["title", "description", "priority"]
+
+class PlagiarismReportSerializer(serializers.ModelSerializer):
+    # Frontend expects specific field names
+    id = serializers.CharField(source='pk', read_only=True)
+    courseCode = serializers.CharField(source='assignment.lesson.module.course.title', read_only=True)
+    courseTitle = serializers.CharField(source='assignment.lesson.module.course.title', read_only=True)
+    assessmentType = serializers.SerializerMethodField()
+    assessmentTitle = serializers.CharField(source='assignment.title', read_only=True)
+    student = serializers.SerializerMethodField()
+    submittedAt = serializers.DateTimeField(source='submitted_at', read_only=True)
+    flaggedAt = serializers.DateTimeField(source='submitted_at', read_only=True)
+    riskLevel = serializers.SerializerMethodField()
+    score = serializers.FloatField(source='plagiarism_score', read_only=True)
+    status = serializers.SerializerMethodField()
+    
+    # Mock evidence structure to prevent frontend crash
+    evidence = serializers.SerializerMethodField()
+    metadata = serializers.SerializerMethodField()
+    text = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AssignmentSubmission
+        fields = [
+            'id', 'courseCode', 'courseTitle', 'assessmentType', 'assessmentTitle',
+            'student', 'submittedAt', 'flaggedAt', 'riskLevel', 'score',
+            'status', 'evidence', 'metadata', 'text'
+        ]
+
+    def get_assessmentType(self, obj):
+        return "Assignment"
+
+    def get_student(self, obj):
+        # Format student object as { id: "...", name: "..." }
+        return {
+            "id": obj.student.user.username,
+            "name": getattr(obj.student.user, 'profile', None) and obj.student.user.profile.full_name or obj.student.user.username
+        }
+
+    def get_riskLevel(self, obj):
+        score = obj.plagiarism_score or 0
+        if score >= 75: return "High"
+        if score >= 40: return "Review"
+        return "Low"
+
+    def get_status(self, obj):
+        return "Open" 
+
+    def get_evidence(self, obj):
+        # Return empty structure if no specific report exists
+        return getattr(obj, 'plagiarism_report', {}) or {
+            "internalMatches": [], 
+            "externalSources": [],
+        }
+
+    def get_metadata(self, obj):
+        return {
+            "submitAt": obj.submitted_at,
+            "deviceId": "Unknown"
+        }
+
+    def get_text(self, obj):
+        # 1. Get Student Text (from the field we added earlier)
+        student_text = obj.extracted_text if obj.extracted_text else "Text content preview unavailable."
+        
+        # 2. Get Match Text (from the JSON report we just updated)
+        report = obj.plagiarism_report or {}
+        match_text = report.get('matched_source_text', "No significant match found.")
+
+        # 3. Return to Frontend
+        return {
+            "studentText": student_text, 
+            "matchText": match_text, # ✅ This will now show the text!
+            "studentHighlights": [],
+            "matchHighlights": []
+        }

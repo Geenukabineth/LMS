@@ -35,6 +35,7 @@ const Sidebar = ({ activeTab, setActiveTab, userType }) => {
     { id: "PlagiarismReports", label: "PlagiarismReports", icon: FileText , roles: [ "instructor"]},
     {id: 'courses', icon: BookOpen, label: 'My Courses', roles: ['student']},
     {id: 'browse', icon: ShoppingCart, label: 'Browse Courses', roles: ['student']},
+    {id: 'complaints', icon: FileText, label: 'Complaints', roles: ['student']},
    
     {id: 'payment', icon: CreditCard, label: 'Payment History', roles: ['student']}, 
     { id: "programs", label: "Programs & Courses", icon: BookOpen, roles: ["admin", ] },

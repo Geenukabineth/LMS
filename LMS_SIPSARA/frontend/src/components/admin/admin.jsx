@@ -34,6 +34,7 @@ import TeacherPaymentPage from "@/components/data/Teacherpaymentpage ";
 import { courseService } from "@/config/course.config";
 import { userService } from "../../config/user.config";
 
+
 export default function TeachersDashboard() {
   const [activeTab, setActiveTab] = useState("teacherdashboard");
   const [loading, setLoading] = useState(true);
@@ -88,7 +89,7 @@ export default function TeachersDashboard() {
         
         if (data) {
             setLessonsCount(data.total_lessons || 0);
-            setQuestionsCount(data.total_questions || 0);
+            setQuestionsCount(data.total_quizzes || 0);
             setChartData(data.chart_data || []);
             setUpcomingClasses(data.upcoming_classes || []);
         }

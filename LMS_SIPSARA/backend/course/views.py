@@ -1,3 +1,4 @@
+import requests
 from rest_framework import permissions, status
 from rest_framework.generics import CreateAPIView, RetrieveAPIView, UpdateAPIView, DestroyAPIView, ListAPIView
 from rest_framework.response import Response
@@ -10,27 +11,16 @@ from django.core.exceptions import PermissionDenied
 from datetime import timedelta
 
 from .models import (
-    Course, EnrolledCourse, Variant, VariantItem, Module, Lesson,
+    Course, EnrolledCourse, LiveAttendance, Variant, VariantItem, Module, Lesson,
     CompletedLesson, Note, Review, Question_Answer, Question_Answer_Message,LiveSession
 )
 
-from .serializers import (
-    CourseSerializer, CourseCreateSerializer, AdminCourseCreateSerializer,
-    EnrolledCourseSerializer, ModuleSerializer, LessonSerializer,
-    ReviewSerializer, FileUploadSerializer,
-    StudentEnrolledCoursesSerializer, ReceptionistEnrollmentSerializer,
-    BulkEnrollmentCreateSerializer, AdminCourseUpdateSerializer
-)
+from .serializers import *
 
 from lms.models import Teacher, Student
 from django.db import IntegrityError
 import traceback
 from rest_framework.pagination import PageNumberPagination
-
-
-# ============================================================================
-# ✅ ADMIN COURSE CREATE
-# ============================================================================
 
 class AdminCourseCreateAPIView(CreateAPIView):
     serializer_class = AdminCourseCreateSerializer
@@ -44,7 +34,6 @@ class AdminCourseCreateAPIView(CreateAPIView):
                     {"error": "Only administrators can create courses."},
                     status=status.HTTP_403_FORBIDDEN
                 )
-
             teacher_id = request.data.get('teacher')
             if not teacher_id:
                 return Response({"error": "Teacher is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -63,7 +52,7 @@ class AdminCourseCreateAPIView(CreateAPIView):
             serializer.is_valid(raise_exception=True)
             course = serializer.save()
 
-            return Response(CourseSerializer(course, context={'request': request}).data, status=status.HTTP_201_CREATED)
+            return Response(CourseSerializer(course, context={'request': request}).data, status=status.HTTP_200_OK)
 
         except IntegrityError as e:
             return Response(
@@ -134,11 +123,6 @@ class EnrollmentDashboardStats(APIView):
             "top_courses": top_courses
         }, status=status.HTTP_200_OK)
 
-
-# ============================================================================
-# ✅ TEACHER ASSIGNMENT WORKFLOW
-# ============================================================================
-
 class TeacherCourseAssignmentAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -191,11 +175,6 @@ class CourseTeacherListAPIView(ListAPIView):
         context['request'] = self.request
         return context
 
-
-# ============================================================================
-# ✅ SEARCH + DETAILS
-# ============================================================================
-
 class SearchCourseAPIView(ListAPIView):
     serializer_class = CourseSerializer
     permission_classes = [permissions.AllowAny]
@@ -230,11 +209,6 @@ class CourseDetailAPIView(RetrieveAPIView):
     def get_queryset(self):
         return Course.objects.filter(platform_status='published')
 
-
-# ============================================================================
-# ✅ COURSE CREATE/UPDATE/DELETE (Teacher)
-# ============================================================================
-
 class CourseCreateAPIView(CreateAPIView):
     serializer_class = CourseCreateSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -248,7 +222,7 @@ class CourseCreateAPIView(CreateAPIView):
             serializer = self.get_serializer(data=data)
             serializer.is_valid(raise_exception=True)
             course = serializer.save()
-            return Response(CourseSerializer(course, context={'request': request}).data, status=status.HTTP_201_CREATED)
+            return Response(CourseSerializer(course, context={'request': request}).data, status=status.HTTP_200_OK)
         except Teacher.DoesNotExist:
             return Response({"error": "You must be registered as a teacher"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -301,11 +275,6 @@ class CourseDestroyAPIView(DestroyAPIView):
             return get_object_or_404(self.get_queryset(), slug=slug)
         raise PermissionDenied("Course identifier missing")
 
-
-# ============================================================================
-# ✅ ENROLL (Student)
-# ============================================================================
-
 class EnrollCourseAPIView(CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -338,7 +307,7 @@ class EnrollCourseAPIView(CreateAPIView):
 
         return Response(
             EnrolledCourseSerializer(enrolled, context={'request': request}).data,
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_200_OK
         )
 
 
@@ -430,7 +399,7 @@ class FileUploadAPIView(CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         f = serializer.validated_data['file']
-        return Response({'filename': f.name, 'size': f.size}, status=status.HTTP_201_CREATED)
+        return Response({'filename': f.name, 'size': f.size}, status=status.HTTP_200_OK)
 
 
 # ============================================================================
@@ -549,7 +518,7 @@ class EnrollmentCreateAPIView(CreateAPIView):
         )
 
         serializer = self.get_serializer(enrollment)
-        return Response({"message": "Enrollment created", "enrollment": serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({"message": "Enrollment created", "enrollment": serializer.data}, status=status.HTTP_200_OK)
 
 
 class BulkEnrollmentCreateAPIView(CreateAPIView):
@@ -612,7 +581,7 @@ class BulkEnrollmentCreateAPIView(CreateAPIView):
             "total_failed": len(failed),
             "created_enrollments": created,
             "failed_enrollments": failed
-        }, status=status.HTTP_201_CREATED if created else status.HTTP_400_BAD_REQUEST)
+        }, status=status.HTTP_200_OK if created else status.HTTP_400_BAD_REQUEST)
 
 
 class EnrollmentExpiringAPIView(ListAPIView):
@@ -634,6 +603,8 @@ class EnrollmentExpiringAPIView(ListAPIView):
 # ============================================================================
 # ✅ STUDENT PORTAL ENDPOINTS
 # ============================================================================
+
+# In views.py
 
 class StudentEnrolledCoursesListAPIView(ListAPIView):
     serializer_class = StudentEnrolledCoursesSerializer
@@ -663,8 +634,11 @@ class StudentEnrolledCoursesListAPIView(ListAPIView):
         student_instance = getattr(self, 'student_instance', None)
         active_count = EnrolledCourse.objects.filter(user=student_instance, status='active').count() if student_instance else 0
 
-        # Works for both paginated and non-paginated responses
-        results = response.data.get("results", response.data)
+        # ✅ FIX: Handle case where response.data is a list (pagination off) or dict (pagination on)
+        if isinstance(response.data, list):
+            results = response.data
+        else:
+            results = response.data.get("results", response.data)
 
         response.data = {
             "summary": {
@@ -822,7 +796,7 @@ class ModuleAPIView(CreateAPIView):
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     def put(self, request, *args, **kwargs):
         module_id = kwargs.get('module_id') or request.data.get('module_id')
         if not module_id:
@@ -904,7 +878,7 @@ class LessonCreateAPIView(CreateAPIView):
         else:
             lesson = serializer.save()
 
-        return Response(self.get_serializer(lesson).data, status=status.HTTP_201_CREATED)
+        return Response(self.get_serializer(lesson).data, status=status.HTTP_200_OK)
 
     
 
@@ -985,31 +959,24 @@ class TeacherDashboardStatsAPIView(APIView):
             return Response({"error": "Teacher profile not found"}, status=404)
 
         # 1. Total Counts
-        # Count lessons in modules belonging to courses owned by the teacher
         total_lessons = Lesson.objects.filter(module__course__teacher=teacher).count()
+        total_quizzes = Quiz.objects.filter(lesson__module__course__teacher=teacher).count()
         
-        # Count Q&A threads in teacher's courses
-        total_questions = Question_Answer.objects.filter(course__teacher=teacher).count()
-        
-        # 2. Bar Chart Data (Attendance/Enrollment per Course)
-        # Group enrollments by course and count them
+        # 2. Bar Chart Data
         courses = Course.objects.filter(teacher=teacher)
         chart_data = []
-        
         for course in courses:
             student_count = EnrolledCourse.objects.filter(course=course).count()
-            # Only add to chart if there are students, or keep all to show 0s
             chart_data.append({
-                "name": course.title[:15] + "..." if len(course.title) > 15 else course.title, # Truncate long titles
+                "name": course.title[:15] + "..." if len(course.title) > 15 else course.title,
                 "students": student_count
             })
 
         # 3. Upcoming Classes (Live Sessions)
-        # If you added the LiveSession model:
         upcoming_sessions = LiveSession.objects.filter(
             course__teacher=teacher, 
             is_completed=False
-        ).order_by('date', 'time')[:5] # Get next 5
+        ).order_by('date', 'time')[:5]
         
         upcoming_data = [
             {
@@ -1017,16 +984,14 @@ class TeacherDashboardStatsAPIView(APIView):
                 "name": session.course.title,
                 "topic": session.title,
                 "time": f"{session.date} at {session.time}",
-                "link": session.meeting_link
+                # ✅ FIX: Change 'meeting_link' to 'join_url'
+                "link": session.join_url 
             } for session in upcoming_sessions
         ]
 
-        # If you DID NOT add the model, use this dummy data for now so frontend doesn't break:
-        # upcoming_data = [] 
-
         return Response({
             "total_lessons": total_lessons,
-            "total_questions": total_questions,
+            "total_quizzes": total_quizzes,
             "chart_data": chart_data,
             "upcoming_classes": upcoming_data
         })
@@ -1063,20 +1028,19 @@ class AssignmentDetailAPIView(RetrieveUpdateDestroyAPIView):
     queryset = Assignment.objects.all()
 
     def get_object(self):
-        # Get the ID from the URL (e.g., 325)
         pk = self.kwargs.get('pk')
-        
-        # 1. Try to find the Assignment by its real ID
         assignment = Assignment.objects.filter(pk=pk).first()
-        
-        # 2. If not found, assume the ID passed was a LESSON ID and try to find the assignment for that lesson
         if not assignment:
             assignment = get_object_or_404(Assignment, lesson_id=pk)
-            
-        # Check permissions (standard Django Rest Framework check)
         self.check_object_permissions(self.request, assignment)
         
         return assignment
+    def perform_destroy(self, instance):
+        # Delete the parent Lesson to remove it completely from the module list
+        if instance.lesson:
+            instance.lesson.delete()
+        else:
+            instance.delete()
 
 
 class QuizDetailAPIView(RetrieveUpdateDestroyAPIView):
@@ -1085,19 +1049,23 @@ class QuizDetailAPIView(RetrieveUpdateDestroyAPIView):
     queryset = Quiz.objects.all()
 
     def get_object(self):
-        # Get the ID from the URL
         pk = self.kwargs.get('pk')
 
-        # 1. Try to find the Quiz by its real ID
         quiz = Quiz.objects.filter(pk=pk).first()
 
-        # 2. If not found, try to find the Quiz by the LESSON ID
         if not quiz:
             quiz = get_object_or_404(Quiz, lesson_id=pk)
 
         self.check_object_permissions(self.request, quiz)
         
         return quiz
+    def perform_destroy(self, instance):
+        # Delete the parent Lesson. 
+        # Because of on_delete=models.CASCADE in models.py, this will also delete the Quiz instance.
+        if instance.lesson:
+            instance.lesson.delete()
+        else:
+            instance.delete()
 
 class QuizListCreateAPIView(ListCreateAPIView):
     serializer_class = QuizSerializer
@@ -1119,9 +1087,15 @@ class QuizListCreateAPIView(ListCreateAPIView):
 
 
 
+# ... imports ...
+from rest_framework.parsers import MultiPartParser, FormParser 
+# ...
+
 class QuizQuestionListCreateAPIView(ListCreateAPIView):
     serializer_class = QuizQuestionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    # ✅ Add parsers to handle image uploads
+    parser_classes = (MultiPartParser, FormParser) 
 
     def get_queryset(self):
         quiz_id = self.request.query_params.get("quiz")
@@ -1131,16 +1105,18 @@ class QuizQuestionListCreateAPIView(ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
+        # ... existing logic ...
         quiz = get_object_or_404(Quiz, id=self.request.data.get("quiz"))
         lesson = quiz.lesson
         if not self.request.user.is_staff and lesson.module.course.teacher.user != self.request.user:
             raise PermissionDenied("Permission denied")
         serializer.save()
 
-
 class QuizQuestionDetailAPIView(RetrieveUpdateDestroyAPIView):
     serializer_class = QuizQuestionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    # ✅ Add parsers here too for updates
+    parser_classes = (MultiPartParser, FormParser)
     queryset = QuizQuestion.objects.all()
 
 
@@ -1249,18 +1225,123 @@ class StudentDashboardStatsAPIView(APIView):
 
 from .models import AssignmentSubmission, QuizAttempt, Student
 from .serializers import AssignmentSubmissionSerializer, QuizAttemptSerializer
+# In views.py
 
-# --- Submission Views ---
+# 1. Add imports at the top
+from .utils import extract_text_from_file, check_plagiarism, check_web_plagiarism
 
 class SubmitAssignmentAPIView(CreateAPIView):
     serializer_class = AssignmentSubmissionSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
+    def create(self, request, *args, **kwargs):
+        # Override create to handle re-submissions (Update vs Create)
+        student = get_object_or_404(Student, user=request.user)
+        assignment_id = request.data.get('assignment')
+        
+        # Check if submission exists
+        existing_submission = AssignmentSubmission.objects.filter(
+            student=student, 
+            assignment_id=assignment_id
+        ).first()
+
+        if existing_submission:
+            serializer = self.get_serializer(existing_submission, data=request.data, partial=True)
+        else:
+            serializer = self.get_serializer(data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer) # Run the logic
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK if existing_submission else status.HTTP_201_CREATED, headers=headers)
+
     def perform_create(self, serializer):
         student = get_object_or_404(Student, user=self.request.user)
-        serializer.save(student=student)
+        assignment_id = self.request.data.get('assignment')
+        uploaded_file = self.request.FILES.get('file')
 
+        final_score = 0.0
+        current_text = ""
+        matched_source_text = ""
+        internal_score = 0.0
+        external_score = 0.0
+        
+        report_data = {
+            "internalMatches": [],
+            "externalSources": [],
+            "matched_source_text": "",
+            "evidence": {} 
+        }
+
+        if uploaded_file and assignment_id:
+            # 1. Extract Text
+            current_text = extract_text_from_file(uploaded_file)
+            
+            if current_text:
+                # -------------------------------------------------------
+                # 2. INTERNAL CHECK (Previous Students)
+                # -------------------------------------------------------
+                other_submissions = AssignmentSubmission.objects.filter(
+                    assignment_id=assignment_id
+                ).exclude(student=student)
+
+                previous_texts = []
+                for sub in other_submissions:
+                    # Optimization: Use saved text if available, else read file
+                    if hasattr(sub, 'extracted_text') and sub.extracted_text:
+                        previous_texts.append(sub.extracted_text)
+                    elif sub.file:
+                        try:
+                            with sub.file.open('rb') as f:
+                                t = extract_text_from_file(f)
+                                if t: previous_texts.append(t)
+                        except Exception:
+                            continue
+                
+                # Check plagiarism (returns dict: {'score': float, 'matched_text': str})
+                internal_result = check_plagiarism(current_text, previous_texts)
+                
+                # Handle dictionary response from updated utils.py
+                if isinstance(internal_result, dict):
+                    internal_score = internal_result.get('score', 0.0)
+                    matched_source_text = internal_result.get('matched_text', "")
+                else:
+                    # Fallback if utils returns just a float
+                    internal_score = internal_result
+
+                # -------------------------------------------------------
+                # 3. EXTERNAL CHECK (Google / Web)
+                # -------------------------------------------------------
+                external_sources = check_web_plagiarism(current_text)
+                report_data["externalSources"] = external_sources
+                
+                # Calculate max score from external sources
+                if external_sources:
+                    external_score = max([s['similarityPercent'] for s in external_sources])
+
+                # -------------------------------------------------------
+                # 4. FINAL CALCULATION
+                # -------------------------------------------------------
+                # Take the higher of the two scores
+                final_score = max(internal_score, external_score)
+                
+                # If internal match was higher/exists, save the text for comparison
+                if internal_score >= external_score:
+                    report_data['matched_source_text'] = matched_source_text
+                else:
+                    # If web match is higher, you might want to show the URL snippet instead
+                    # For now, we leave matched_source_text empty or set a message
+                    if external_sources:
+                         report_data['matched_source_text'] = f"Top match found on web: {external_sources[0]['url']}"
+
+        # 5. Save Score AND the Report JSON AND Extracted Text
+        serializer.save(
+            student=student, 
+            plagiarism_score=final_score,
+            plagiarism_report=report_data,
+            extracted_text=current_text 
+        )
 class SubmitQuizAPIView(CreateAPIView):
     serializer_class = QuizAttemptSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -1291,3 +1372,448 @@ class GradeSubmissionAPIView(UpdateAPIView):
     def perform_update(self, serializer):
         # Allow teacher to update grade and feedback
         serializer.save()
+
+from django.db.models import Avg
+
+
+class StudentCourseReviewListCreateAPIView(ListCreateAPIView):
+  
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        course_id = self.kwargs.get('course_id')
+
+        # Optional: only if student is enrolled
+        try:
+            student = Student.objects.get(user=self.request.user)
+        except Student.DoesNotExist:
+            raise PermissionDenied("Student profile not found")
+
+        enrollment = get_object_or_404(
+            EnrolledCourse,
+            user=student,
+            course_id=course_id
+        )
+
+        if not enrollment.has_access():
+            raise PermissionDenied("Your enrollment for this course has expired.")
+
+        return Review.objects.filter(course_id=course_id, active=True).select_related("user")
+
+    def perform_create(self, serializer):
+        """
+        Called automatically on POST.
+        Attach course + user here instead of expecting them in the request body.
+        """
+        course_id = self.kwargs.get('course_id')
+        course = get_object_or_404(Course, pk=course_id)
+
+        try:
+            student = Student.objects.get(user=self.request.user)
+        except Student.DoesNotExist:
+            raise PermissionDenied("Student profile not found")
+
+        enrollment = get_object_or_404(
+            EnrolledCourse,
+            user=student,
+            course=course
+        )
+
+        if not enrollment.has_access():
+            raise PermissionDenied("Your enrollment for this course has expired.")
+
+        # ensure only one review per user per course (optional)
+        Review.objects.filter(course=course, user=self.request.user).delete()
+
+        serializer.save(
+            course=course,
+            user=self.request.user,
+            active=True,
+        )
+
+from rest_framework.generics import RetrieveUpdateDestroyAPIView
+
+# --- 1. Student Review Management (Edit/Delete) ---
+class StudentReviewDetailAPIView(RetrieveUpdateDestroyAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Users can only edit/delete their OWN reviews
+        return Review.objects.filter(user=self.request.user)
+
+# --- 2. Student Feedback Management (Edit/Delete) ---
+
+class TeacherReviewReplyAPIView(UpdateAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self):
+        teacher = get_object_or_404(Teacher, user=self.request.user)
+        # Teacher can only reply to reviews on their courses
+        return Review.objects.filter(course__teacher=teacher)
+
+    def put(self, request, *args, **kwargs):
+        review = self.get_object()
+        reply = request.data.get("reply")
+        if reply is not None:
+            review.reply = reply
+        if "active" in request.data:
+            review.active = bool(request.data.get("active"))
+        review.save()
+        serializer = self.get_serializer(review)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def update(self, request, *args, **kwargs):
+        # just use partial
+        return self.partial_update(request, *args, **kwargs)
+    
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions, status
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+import shortuuid # Make sure you have this installed: pip install shortuuid
+
+from .models import Course, LiveSession, LiveAttendance, EnrolledCourse
+from lms.models import Teacher, Student
+from .serializers import LiveSessionSerializer
+
+class CreateLiveSessionAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        course_id = request.data.get('course_id')
+        title = request.data.get('title')
+        date = request.data.get('date') # YYYY-MM-DD
+        time = request.data.get('time') # HH:MM
+
+        course = get_object_or_404(Course, id=course_id)
+
+        if not request.user.is_staff:
+            try:
+                teacher = Teacher.objects.get(user=request.user)
+                if course.teacher != teacher:
+                    return Response({"error": "Unauthorized"}, status=403)
+            except Teacher.DoesNotExist:
+                return Response({"error": "Unauthorized"}, status=403)
+
+        try:
+            clean_title = "".join(e for e in course.title if e.isalnum())
+            unique_id = shortuuid.uuid()[:8]
+            room_name = f"Sipsara_{clean_title}_{unique_id}"
+
+            # 2. Construct the URL (Using public Jitsi server)
+            # You can change 'https://meet.jit.si' to your own domain if self-hosting
+            jitsi_url = f"https://meet.jit.si/{room_name}"
+            
+            # 3. Save to DB
+            session = LiveSession.objects.create(
+                course=course,
+                title=title,
+                date=date,
+                time=time,
+                meeting_id=room_name,  # Storing room name as ID
+                join_url=jitsi_url,
+                start_url=jitsi_url    # Jitsi links are same for host/student usually
+            )
+
+            return Response(LiveSessionSerializer(session).data, status=201)
+
+        except Exception as e:
+            return Response({"error": f"Error creating session: {str(e)}"}, status=500)
+
+# --- 2. List Sessions (Unchanged) ---
+class LiveSessionListAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id):
+        course = get_object_or_404(Course, id=course_id)
+        user = request.user
+        has_access = False
+        
+        # Check Teacher
+        if hasattr(user, 'teacher_profile') and course.teacher.user == user:
+            has_access = True
+        # Check Student
+        elif Student.objects.filter(user=user).exists():
+            student = Student.objects.get(user=user)
+            if EnrolledCourse.objects.filter(course=course, user=student, status='active').exists():
+                has_access = True
+        # Check Admin
+        if user.is_staff: has_access = True
+
+        if not has_access:
+            return Response({"error": "Access denied."}, status=403)
+
+        sessions = LiveSession.objects.filter(course=course).order_by('-date', '-time')
+        return Response(LiveSessionSerializer(sessions, many=True).data)
+
+# --- 3. Join & Mark Attendance (Unchanged) ---
+class MarkAttendanceAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        session_id = request.data.get('session_id')
+        session = get_object_or_404(LiveSession, id=session_id)
+
+        try:
+            student = Student.objects.get(user=request.user)
+            # Mark Attendance
+            LiveAttendance.objects.get_or_create(session=session, student=student, defaults={'status': 'present', 'join_time': timezone.now()})
+            return Response({"join_url": session.join_url}, status=200)
+        except Student.DoesNotExist:
+            # If teacher clicks join, just return URL without attendance
+            return Response({"join_url": session.join_url}, status=200)
+
+# backend/course/views.py
+
+# backend/course/views.py
+
+# backend/course/views.py
+
+class StudentCourseFeedbackListCreateAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id):
+        # Fetch all feedback threads for the course
+        feedback = Question_Answer.objects.filter(course_id=course_id).order_by('-date')
+        serializer = Question_AnswerSerializer(feedback, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, course_id):
+        course = get_object_or_404(Course, pk=course_id)
+        serializer = Question_AnswerSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            # ✅ Fix: Only save valid fields (course, user). Do NOT pass 'lesson'.
+            serializer.save(course=course, user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class StudentFeedbackDetailAPIView(RetrieveUpdateDestroyAPIView):
+    serializer_class = Question_AnswerSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Question_Answer.objects.all()
+
+    def get_object(self):
+        pk = self.kwargs.get('pk')
+        # Ensure the user owns the feedback they are trying to edit/delete
+        qa = get_object_or_404(Question_Answer, pk=pk)
+        if qa.user != self.request.user:
+            raise PermissionDenied("You can only edit or delete your own feedback.")
+        return qa
+
+class StudentFeedbackReplyAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    # ✅ GET: List all replies for a specific feedback thread
+    def get(self, request, course_id, qa_id):
+        # Ensure course and question exist
+        get_object_or_404(Course, pk=course_id)
+        get_object_or_404(Question_Answer, pk=qa_id)
+
+        # Fetch messages for this thread
+        replies = Question_Answer_Message.objects.filter(question_id=qa_id).order_by('date')
+        serializer = Question_Answer_MessageSerializer(replies, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # ✅ POST: Create a new reply
+    def post(self, request, course_id, qa_id):
+        course = get_object_or_404(Course, pk=course_id)
+        qa = get_object_or_404(Question_Answer, pk=qa_id)
+        
+        # Ensure we set 'question' (parent thread) AND 'course'
+        msg = Question_Answer_Message.objects.create(
+            course=course,
+            question=qa,
+            user=request.user,
+            message=request.data.get('message')
+        )
+        
+        return Response({"message": "Reply added", "id": msg.id}, status=status.HTTP_201_CREATED)
+
+
+# --- 2. Edit & Delete Specific Reply (Message Level) ---
+class StudentFeedbackReplyDetailAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, pk, user):
+        # Get message and ensure ownership
+        msg = get_object_or_404(Question_Answer_Message, pk=pk)
+        if msg.user != user:
+            raise PermissionDenied("You cannot modify this reply.")
+        return msg
+
+    # ✅ PUT: Update a specific reply
+    def put(self, request, course_id, qa_id, pk):
+        msg = self.get_object(pk, request.user)
+        
+        serializer = Question_Answer_MessageSerializer(msg, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # ✅ DELETE: Delete a specific reply
+    def delete(self, request, course_id, qa_id, pk):
+        msg = self.get_object(pk, request.user)
+        msg.delete()
+        return Response({"message": "Reply deleted"}, status=status.HTTP_204_NO_CONTENT)
+def is_admin(user):
+    return bool(user and user.is_staff)
+
+def get_teacher(user):
+    if not user.is_authenticated: return None
+    try:
+        return Teacher.objects.get(user=user)
+    except Teacher.DoesNotExist:
+        return None
+
+def get_student(user):
+    if not user.is_authenticated: return None
+    try:
+        return Student.objects.get(user=user)
+    except Student.DoesNotExist:
+        return None
+
+# --- Complaint Views ---
+
+class ComplaintCourseAPIView(APIView):
+    """
+    GET: List complaints for a course 
+    - Admin: All complaints
+    - Teacher: Complaints for courses they teach
+    - Student: Only their own complaints
+    POST: Create a complaint (Student only)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id):
+        course = get_object_or_404(Course, pk=course_id)
+
+        # 1. Admin Logic
+        if is_admin(request.user):
+            qs = Complaint.objects.filter(course=course)
+            return Response(ComplaintSerializer(qs, many=True).data)
+
+        # 2. Teacher Logic
+        teacher = get_teacher(request.user)
+        if teacher:
+            # Check if this course belongs to this teacher
+            if course.teacher == teacher:
+                qs = Complaint.objects.filter(course=course)
+                return Response(ComplaintSerializer(qs, many=True).data)
+
+        # 3. Student Logic
+        # (Allows students to see their previous complaints)
+        qs = Complaint.objects.filter(course=course, user=request.user)
+        return Response(ComplaintSerializer(qs, many=True).data)
+
+    def post(self, request, course_id):
+        course = get_object_or_404(Course, pk=course_id)
+        
+        # Security: Admins shouldn't be submitting student complaints
+        if is_admin(request.user):
+             return Response({"error": "Admins cannot submit student complaints."}, status=400)
+
+        # Security: Check Enrollment
+        if not EnrolledCourse.objects.filter(user__user=request.user, course=course, status='active').exists():
+             return Response({"error": "You must be enrolled in this course to submit a complaint."}, status=403)
+
+        send_to = request.data.get("send_to", "teacher")
+        if send_to not in ["admin", "teacher"]:
+            send_to = "teacher"
+
+        # Auto-assign the teacher if sent to teacher
+        teacher_obj = course.teacher if send_to == "teacher" else None
+
+        serializer = ComplaintSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(
+                user=request.user,
+                course=course,
+                send_to=send_to,
+                teacher=teacher_obj,
+                status="open",
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ComplaintDetailAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, request, pk):
+        obj = get_object_or_404(Complaint, pk=pk)
+
+        # Admin Access
+        if is_admin(request.user):
+            return obj
+        
+        # Teacher Access (Owner of course)
+        teacher = get_teacher(request.user)
+        if teacher and obj.course.teacher == teacher:
+            return obj
+
+        # Student Access (Owner of complaint)
+        if obj.user == request.user:
+            return obj
+
+        raise PermissionDenied("You do not have permission to access this complaint.")
+
+    def get(self, request, pk):
+        obj = self.get_object(request, pk)
+        return Response(ComplaintSerializer(obj).data)
+
+    def put(self, request, pk):
+        # Used for full updates (e.g. Teacher replying and closing ticket)
+        obj = self.get_object(request, pk)
+        serializer = ComplaintUpdateSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        # Partial update
+        obj = self.get_object(request, pk)
+        serializer = ComplaintUpdateSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        obj = self.get_object(request, pk)
+        # Only Admin or the Creator can delete
+        if is_admin(request.user) or obj.user == request.user:
+            obj.delete()
+            return Response({"detail": "Deleted"}, status=status.HTTP_204_NO_CONTENT)
+        
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+    
+# Add this class to your views.py
+# backend/course/views.py
+
+class PlagiarismReportListAPIView(ListAPIView):
+    serializer_class = PlagiarismReportSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # 1. Teachers: See submissions for their courses
+        if hasattr(user, 'teacher_profile'):
+            return AssignmentSubmission.objects.filter(
+                assignment__lesson__module__course__teacher__user=user
+            ).order_by('-submitted_at')
+            
+        # 2. Admins: See ALL submissions
+        elif user.is_staff:
+            return AssignmentSubmission.objects.all().order_by('-submitted_at')
+            
+        return AssignmentSubmission.objects.none()

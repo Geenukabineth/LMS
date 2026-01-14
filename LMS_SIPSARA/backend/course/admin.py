@@ -216,3 +216,5 @@ class AssignmentAdmin(admin.ModelAdmin):
             if self._has(f):
                 ro.append(f)
         return tuple(ro)
+
+

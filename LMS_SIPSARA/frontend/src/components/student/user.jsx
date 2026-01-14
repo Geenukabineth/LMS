@@ -12,6 +12,7 @@ import SettingsPanel from "@/components/setting";
 import TeamsLMSChat from "@/components/chat";
 import StudentCourseView from "@/components/courseData/Studentcourseview";
 import Sidebar from "@/components/Sidebar";
+import Complain from "@/components/student/Complain";
 
 
 import StudentPaymentHistory from "@/components/Student/StudentPaymentHistory";
@@ -291,6 +292,7 @@ const StudentPortal = () => {
           {/* Tabs */}
           {activeTab === "browse" && <CourseBrowsePage />}
           {activeTab === "courses" && <StudentCourseView />}
+          {activeTab === "complaints" && <Complain />}
           
           {activeTab === "payment" && <StudentPaymentHistory />}
           {activeTab === "chat" && <TeamsLMSChat />}

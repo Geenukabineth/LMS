@@ -268,6 +268,7 @@ class Quiz(models.Model):
     lesson = models.OneToOneField("Lesson", on_delete=models.CASCADE, related_name="quiz")
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
+    due_date = models.DateTimeField(null=True, blank=True, help_text="Date and time when the quiz closes")
     time_limit = models.IntegerField(null=True, blank=True)
     attempts = models.IntegerField(default=1)
     shuffle_questions = models.BooleanField(default=False)
@@ -284,6 +285,7 @@ class QuizQuestion(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="questions")
     type = models.CharField(max_length=50)  # multiple_choice, true_false, etc.
     question = models.TextField()
+    image = models.ImageField(upload_to='quiz-questions/', blank=True, null=True)
     points = models.IntegerField(default=1)
     options = models.JSONField(default=list, blank=True)  # for MCQ
     correct_answer = models.CharField(max_length=255, blank=True, default="")
@@ -454,6 +456,9 @@ class AssignmentSubmission(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='submissions')
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     file = models.FileField(upload_to='submissions/', null=True, blank=True)
+    plagiarism_score = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    plagiarism_report = models.JSONField(default=dict, blank=True, null=True)
+    extracted_text = models.TextField(blank=True, null=True, help_text="Text content extracted from the file")
     grade = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     feedback = models.TextField(null=True, blank=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
@@ -522,3 +527,41 @@ class LiveAttendance(models.Model):
 
     def __str__(self):
         return f"{self.student.user.username} - {self.session.title}"
+    
+class Complaint(models.Model):
+    SEND_TO_CHOICES = (
+        ("admin", "Admin"),
+        ("teacher", "Teacher"),
+    )
+    PRIORITY_CHOICES = (
+        ("low", "Low"),
+        ("medium", "Medium"),
+        ("high", "High"),
+    )
+    STATUS_CHOICES = (
+        ("open", "Open"),
+        ("resolved", "Resolved"),
+        ("closed", "Closed"),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="complaints")
+
+    send_to = models.CharField(max_length=20, choices=SEND_TO_CHOICES, default="teacher")
+
+    # store teacher of that course for easy filtering
+    teacher = models.ForeignKey(Teacher, on_delete=models.SET_NULL, null=True, blank=True)
+    
+
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default="medium")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    reply = models.TextField(null=True, blank=True)
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        app_label = "course"

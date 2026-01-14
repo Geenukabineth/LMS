@@ -223,8 +223,6 @@ CELERY_TIMEZONE = 'UTC'
 
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.sendgrid.net'
 EMAIL_PORT = 2525
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'sendgrid API' # This must be exactly the string 'apikey'
@@ -248,9 +246,7 @@ CHAT_ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/
 
 
 
-
-
-
-
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 

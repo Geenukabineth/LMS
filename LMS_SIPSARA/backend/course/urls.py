@@ -1,46 +1,6 @@
 from django.urls import path
 
-from .views import (
-    AssignmentDetailAPIView,
-    GradeSubmissionAPIView,
-    QuizDetailAPIView,
-    QuizListCreateAPIView,
-    QuizQuestionDetailAPIView,
-    QuizQuestionListCreateAPIView,
-    SearchCourseAPIView,
-    CourseDetailAPIView,
-    CourseCreateAPIView,
-    CourseUpdateAPIView,
-    CourseDestroyAPIView,
-    EnrollCourseAPIView,
-    AdminCourseListAPIView,
-    FileUploadAPIView,
-    AdminCourseCreateAPIView,
-    TeacherCourseAssignmentAPIView,
-    CourseTeacherListAPIView,
-    EnrolledCourseListAPIView,
-    EnrollmentListAPIView,
-    EnrollmentDetailAPIView,
-    EnrollmentCreateAPIView,
-    BulkEnrollmentCreateAPIView,
-    EnrollmentExpiringAPIView,
-    StudentEnrolledCoursesListAPIView,
-    StudentEnrolledCourseDetailAPIView,
-    StudentCourseProgressAPIView,
-    StudentCourseLessonsAPIView,
-    StudentCourseModulesAPIView,
-    ModuleAPIView,
-    LessonCreateAPIView,
-    EnrollmentDashboardStats,
-    CourseDistributionAPIView,
-    TeacherGradingListAPIView,
-    TeacherStudentEnrollmentListAPIView,
-    TeacherDashboardStatsAPIView,
-    AssignmentListCreateAPIView,
-    StudentDashboardStatsAPIView,
-    SubmitAssignmentAPIView,
-    SubmitQuizAPIView,
-)
+from .views import *
 
 urlpatterns = [
     # Public
@@ -126,7 +86,41 @@ urlpatterns = [
     path("teacher/quiz-questions/", QuizQuestionListCreateAPIView.as_view()),
     path("teacher/quiz-questions/<int:pk>/", QuizQuestionDetailAPIView.as_view()),
     path('student/dashboard/stats/', StudentDashboardStatsAPIView.as_view(), name='student-dashboard-stats'),
+    path('student/enrolled-courses/<int:course_id>/reviews/',StudentCourseReviewListCreateAPIView.as_view(),name='student-course-reviews',),
+    path('teacher/reviews/<int:pk>/',TeacherReviewReplyAPIView.as_view(),name='teacher-review-reply'),
+    path('student/review/<int:pk>/', StudentReviewDetailAPIView.as_view(), name='student-review-detail'),
+    path('live/create/', CreateLiveSessionAPIView.as_view(), name='create-live-session'),
+    path('live/list/<int:course_id>/', LiveSessionListAPIView.as_view(), name='list-live-sessions'),
+    path('live/join/', MarkAttendanceAPIView.as_view(), name='join-live-session'),
+   path('student/enrolled-courses/<int:course_id>/feedback/', 
+         StudentCourseFeedbackListCreateAPIView.as_view(), 
+         name='student-course-feedback-list'),
 
+    # ✅ 2. Edit & Delete Feedback (Matches updateCourseFeedback / deleteCourseFeedback)
+    path('student/feedback/<int:pk>/', 
+         StudentFeedbackDetailAPIView.as_view(), 
+         name='student-feedback-detail'),
+    path(
+        "student/enrolled-courses/<int:course_id>/complaints/",
+        ComplaintCourseAPIView.as_view(),
+        name="course-complaints",
+    ),
+    path('student/enrolled-courses/<int:course_id>/feedback/<int:qa_id>/reply/', 
+         StudentFeedbackReplyAPIView.as_view(), 
+         name='student-feedback-reply'),
+
+
+    path('student/enrolled-courses/<int:course_id>/feedback/<int:qa_id>/reply/<int:pk>/', 
+         StudentFeedbackReplyDetailAPIView.as_view(), 
+         name='student-feedback-reply-detail'),
+
+    # Teacher/Admin GET + PUT/PATCH reply + Admin DELETE
+    path(
+        "complaints/<int:pk>/",
+        ComplaintDetailAPIView.as_view(),
+        name="complaint-detail",
+    ),
+     path('teacher/plagiarism-reports/', PlagiarismReportListAPIView.as_view(), name='plagiarism-reports'),
 
 ]
 

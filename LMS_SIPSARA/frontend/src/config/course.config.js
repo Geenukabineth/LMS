@@ -266,6 +266,188 @@ getStudentCourseDetail: async (courseId) => {
     const { data } = await api.get(`Course/student/enrolled-courses/${courseId}/progress/`);
     return data;
   },
+
+  getAssignments: async (filterId, type = 'lesson') => {
+    const params = {};
+    if (type === 'course') {
+        params.course = filterId;
+    } else {
+        params.lesson = filterId;
+    }
+
+    const { data } = await api.get(`Course/teacher/assignments/`, { params });
+    return data;
+  },
+
+  deleteAssignment: async (assignmentId) => {
+    const { data } = await api.delete(`Course/teacher/assignments/${assignmentId}/`);
+    return data;
+  },
+
+  // -------------------- QUIZ CRUD --------------------
+  getQuizzes: async (filterId, type = 'lesson') => {
+    const params = {};
+    if (type === 'course') {
+        params.course = filterId;
+    } else {
+        params.lesson = filterId;
+    }
+
+    const { data } = await api.get(`Course/teacher/quizzes/`, { params });
+    return data;
+  },
+
+  deleteQuiz: async (quizId) => {
+    const { data } = await api.delete(`Course/teacher/quizzes/${quizId}/`);
+    return data;
+  },
+
+updateCourseFeedback(courseId, feedbackId, payload) {
+  // payload example: { title: "updated text" }
+  return api.put(`Course/student/enrolled-courses/${courseId}/feedback/${feedbackId}/`, payload);
+},
+
+deleteCourseFeedback(courseId, feedbackId) {
+  return api.delete(`Course/student/enrolled-courses/${courseId}/feedback/${feedbackId}/`);
+},
+
+getCourseComplaints(courseId) {
+  return api.get(`Course/student/enrolled-courses/${courseId}/complaints/`);
+},
+
+createCourseComplaint(courseId, payload) {
+  // payload example: { title: "...", description: "...", priority: "low|medium|high" }
+  return api.post(`Course/student/enrolled-courses/${courseId}/complaints/`, payload);
+},
+
+updateCourseComplaint: (courseId, complaintId, payload) => {
+    // Note: The courseId param is kept for consistency, but the backend uses complaintId (pk)
+    return api.put(`Course/complaints/${complaintId}/`, payload);
+  },
+
+deleteCourseComplaint: (courseId, complaintId) => {
+    return api.delete(`Course/complaints/${complaintId}/`);
+  },
+  getTeacherComplaints(courseId) {
+    return api.get(`Course/student/enrolled-courses/${courseId}/complaints/`);
+  },
+  
+  // Teacher Reply (Updates the complaint)
+  updateTeacherComplaint(courseId, complaintId, payload) {
+    // Uses the generic update endpoint which handles replies
+    return api.put(`Course/complaints/${complaintId}/`, payload);
+  },
+  
+  // Teacher Create (Unlikely used, but kept for compatibility)
+  createTeacherComplaint(courseId, payload) {
+    return api.post(`Course/student/enrolled-courses/${courseId}/complaints/`, payload);
+  },
+  
+  // Teacher Delete
+  deleteTeacherComplaint(courseId, complaintId) {
+    return api.delete(`Course/complaints/${complaintId}/`);
+  },
+
+
+  // 2. FEEDBACK (Teacher View)
+  getTeacherFeedback(courseId) {
+    return api.get(`Course/student/enrolled-courses/${courseId}/feedback/`);
+  },
+  
+  createTeacherFeedback(courseId, payload) {
+    return api.post(`Course/student/enrolled-courses/${courseId}/feedback/`, payload);
+  },
+  
+  updateTeacherFeedback: async (courseId, feedbackId, payload) => {
+    // Note: feedback.jsx might pass courseId, but the endpoint usually just needs feedbackId (pk)
+    // We ignore courseId here if the backend route is /student/feedback/<pk>/
+    const { data } = await api.put(`Course/student/feedback/${feedbackId}/`, payload);
+    return data;
+  },
+  
+  deleteTeacherFeedback: async (courseId, feedbackId) => {
+    const { data } = await api.delete(`Course/student/feedback/${feedbackId}/`);
+    return data;
+  },
+
+  // ... (Keep existing methods like getStudentEnrolledCourses) ...
+  getStudentEnrolledCourses: async () => {
+    const { data } = await api.get("Course/student/enrolled-courses/");
+    return data;
+  },
+
+  // ⭐ FIXED VERSION
+getCourseReviews: async (courseId) => {
+  return await api.get(`Course/student/enrolled-courses/${courseId}/reviews/`);
+},
+
+submitCourseReview: async (courseId, payload) => {
+  return await api.post(`Course/student/enrolled-courses/${courseId}/reviews/`, payload);
+},
+updateCourseReview: async (reviewId, payload) => {
+    // payload: { rating: 5, review: "Updated text" }
+    const { data } = await api.put(`Course/student/review/${reviewId}/`, payload);
+    return data;
+  },
+
+  deleteCourseReview: async (reviewId) => {
+    const { data } = await api.delete(`Course/student/review/${reviewId}/`);
+    return data;
+  },
+
+  // FEEDBACK / COMPLAINING
+  getCourseFeedback(courseId) {
+    return api.get(`Course/student/enrolled-courses/${courseId}/feedback/`);
+  },
+  createCourseFeedback(courseId, payload) {
+    // payload: { title: "Complaint about ..."}
+    return api.post(`Course/student/enrolled-courses/${courseId}/feedback/`, payload);
+  },
+  updateCourseFeedback: async (feedbackId, payload) => {
+    // payload: { title: "Updated Title" }
+    const { data } = await api.put(`Course/student/feedback/${feedbackId}/`, payload);
+    return data;
+  },
+
+  // ✅ ADD THIS: Delete Feedback
+  deleteCourseFeedback: async (feedbackId) => {
+    const { data } = await api.delete(`Course/student/feedback/${feedbackId}/`);
+    return data;
+  },
+  createLiveSession: async (payload) => {
+    // Payload: { course_id, title, date, time }
+    const { data } = await api.post(`Course/live/create/`, payload);
+    return data;
+  },
+
+  getLiveSessions: async (courseId) => {
+    const { data } = await api.get(`Course/live/list/${courseId}/`);
+    return data;
+  },
+
+  joinSessionAndMarkAttendance: async (sessionId) => {
+    const { data } = await api.post(`Course/live/join/`, { session_id: sessionId });
+    return data; // Returns { join_url: "..." }
+  },
+  
+getStudentEnrolledCourses: async () => {
+  
+    const { data } = await api.get("Course/student/enrolled-courses/");
+    return data;
+  },
+  getPlagiarismReports: async () => {
+    // Endpoint: /Course/teacher/plagiarism-reports/
+    const { data } = await api.get('Course/teacher/plagiarism-reports/');
+    
+    // Fix: Backend returns { count: ..., results: [...] } due to pagination.
+    // We must return data.results if it exists, otherwise data (if it's already an array), or an empty array.
+    return data?.results ?? data ?? []; 
+  },
+
+  updatePlagiarismReportAction: async (reportId, payload) => {
+    const { data } = await api.post(`Course/teacher/plagiarism-reports/${reportId}/action/`, payload);
+    return data;
+  },
  
 
 
