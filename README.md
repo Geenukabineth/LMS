@@ -109,14 +109,7 @@ The core logic resides in `utils.py`:
 * **Plagiarism Logic (`check_web_plagiarism`):**
     The system takes a 200-character chunk of the student's text and queries the Google Custom Search API. It then calculates the Cosine Similarity between the student's text and the search snippets. If similarity exceeds **15%**, it flags the source.
 
-## 🤝 Contributing
 
-Contributions are welcome!
-1.  Fork the repository.
-2.  Create your feature branch (`git checkout -b feature/NewFeature`).
-3.  Commit your changes (`git commit -m 'Add some NewFeature'`).
-4.  Push to the branch (`git push origin feature/NewFeature`).
-5.  Open a Pull Request.
 
 ## 📄 License
 
