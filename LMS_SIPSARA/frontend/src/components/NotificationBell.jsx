@@ -5,7 +5,14 @@ import React, {
   useImperativeHandle,
   useRef,
 } from "react";
-import { Bell, X, UserPlus, Check } from "lucide-react"; // Added UserPlus and Check icons
+import { 
+  Bell, 
+  X, 
+  UserPlus, 
+  Check, 
+  AlertTriangle, 
+  ShieldAlert 
+} from "lucide-react"; 
 import notificationConfig from "@/config/notification.config";
 
 // Helper to format timestamps nicely
@@ -35,7 +42,7 @@ const formatTime = (isoString) => {
 const NotificationBell = forwardRef(({ userId }, ref) => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [loadingAction, setLoadingAction] = useState(null); // Track action loading state
+  const [loadingAction, setLoadingAction] = useState(null); 
 
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -48,10 +55,9 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
 
     const fetchAllNotifications = async () => {
       try {
-        // Fetch Announcements and Personal Notifications (Friend Requests, etc.) in parallel
         const [announcementsData, userNotificationsData] = await Promise.all([
           notificationConfig.getnotification(),
-          notificationConfig.NOTIFICATIONS(), // Calls chat/notifications/
+          notificationConfig.NOTIFICATIONS(), 
         ]);
 
         // 1. Process Announcements
@@ -60,17 +66,17 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
           : announcementsData?.results || [];
 
         const mappedAnnouncements = announcementRows.map((ann) => ({
-          id: `ann_${ann.id}`, // Prefix ID to avoid collision
+          id: `ann_${ann.id}`, 
           originalId: ann.id,
           message: ann.title,
           type: ann.type || "general",
           time: ann.created_at,
           author: ann.author?.username || "System",
           read: false,
-          isActionable: false, // Announcements usually don't have buttons
+          isActionable: false, 
         }));
 
-        // 2. Process Personal Notifications (Friend Requests)
+        // 2. Process Personal Notifications
         const notificationRows = Array.isArray(userNotificationsData)
           ? userNotificationsData
           : userNotificationsData?.results || [];
@@ -78,25 +84,22 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
         const mappedPersonal = notificationRows.map((notif) => ({
           id: `notif_${notif.id}`,
           originalId: notif.id,
-          message: notif.title || notif.message,
-          type: notif.notification_type, // 'friend_request', 'group_invite', etc.
+          message: notif.message || notif.title, // Fixed to prefer message if title is generic
+          type: notif.notification_type, 
           time: notif.created_at,
           author: notif.actor?.username || "System",
           read: notif.is_read,
-          // Store extra data needed for actions
-          friendRequestId: notif.friend_request, // ID from serializer
+          friendRequestId: notif.friend_request, 
           isActionable: notif.notification_type === "friend_request",
         }));
 
         setNotifications((prev) => {
           const seen = new Set(prev.map((n) => n.id));
-          // Merge new data with existing state
           const merged = [
             ...mappedAnnouncements.filter((n) => !seen.has(n.id)),
             ...mappedPersonal.filter((n) => !seen.has(n.id)),
             ...prev,
           ];
-          // Sort by newest first
           merged.sort((a, b) => new Date(b.time) - new Date(a.time));
           return merged;
         });
@@ -111,9 +114,7 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
   // ✅ WebSocket connection
   useEffect(() => {
     if (!token) {
-      console.warn(
-        "⚠️ No auth token found. Notification WebSocket will not connect."
-      );
+      console.warn("⚠️ No auth token found. Notification WebSocket will not connect.");
       return;
     }
 
@@ -122,14 +123,10 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
     const connect = () => {
       if (socketRef.current && socketRef.current.readyState <= 1) return;
 
-      // Note: Ensure your routing.py directs this URL to a consumer that handles notifications
       const wsUrl = `ws://localhost:8000/ws/notifications/?token=${token}`;
-     
-
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
-     
       ws.onmessage = (event) => {
         if (!isActive) return;
 
@@ -139,7 +136,7 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
 
           let newNotification = null;
 
-          // Handle Announcement Push
+          // 1. Handle Announcement Push
           if (data.type === "announcement_push" && data.data) {
             const ann = data.data;
             newNotification = {
@@ -153,7 +150,7 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
               isActionable: false,
             };
           }
-          // Handle Friend Request Push (from ChatConsumer)
+          // 2. Handle Friend Request Push
           else if (data.type === "friend_request" && data.payload) {
              const req = data.payload;
              newNotification = {
@@ -168,7 +165,23 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
                 isActionable: true
              }
           }
-          // Handle Generic/Event Push
+          // 3. ✅ Handle Plagiarism & Misconduct Alerts (NEW)
+          else if (data.type === "send_notification" && data.payload) {
+             const payload = data.payload;
+             // Only process if it matches our target types
+             if (['plagiarism_alert', 'misconduct_alert', 'general'].includes(payload.type)) {
+                 newNotification = {
+                    id: `alert_${Date.now()}`,
+                    message: payload.message,
+                    type: payload.type, 
+                    time: payload.timestamp || new Date().toISOString(),
+                    author: "Instructor",
+                    read: false,
+                    isActionable: false,
+                 };
+             }
+          }
+          // 4. Handle Generic/Event Push fallback
           else if (data.type === "event_push") {
             newNotification = {
               id: data.event_id || `evt_${Date.now()}`,
@@ -183,7 +196,6 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
 
           if (newNotification) {
             setNotifications((prev) => {
-              // Avoid duplicates
               if (prev.some((n) => n.id === newNotification.id)) return prev;
               return [newNotification, ...prev];
             });
@@ -195,17 +207,13 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
 
       ws.onclose = (e) => {
         if (!isActive) return;
-        console.log(`🔓 WS Closed. Code: ${e.code}`);
-
         reconnectTimerRef.current = setTimeout(() => {
           if (isActive) connect();
-        }, 3000); // Increased reconnect time slightly
+        }, 3000); 
       };
 
       ws.onerror = () => {
-        try {
-          ws.close();
-        } catch {}
+        try { ws.close(); } catch {}
       };
     };
 
@@ -213,26 +221,14 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
 
     return () => {
       isActive = false;
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      const ws = socketRef.current;
-      socketRef.current = null;
-      if (
-        ws &&
-        (ws.readyState === WebSocket.OPEN ||
-          ws.readyState === WebSocket.CONNECTING)
-      ) {
-        ws.close();
-      }
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (socketRef.current) socketRef.current.close();
     };
   }, [token]);
 
   useImperativeHandle(ref, () => ({
     addNotification: (announcement) => {
       if (!announcement) return;
-
       const newNotification = {
         id: announcement.id || `manual_${Date.now()}`,
         message: announcement.message || "New notification",
@@ -242,22 +238,14 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
         read: false,
         isActionable: false,
       };
-
-      setNotifications((prev) => {
-        if (prev.some((n) => n.id === newNotification.id)) return prev;
-        return [newNotification, ...prev];
-      });
+      setNotifications((prev) => [newNotification, ...prev]);
     },
   }));
 
-  // Handle Mark as Read
   const handleMarkAsRead = async (notification) => {
-    // Optimistic update
     setNotifications((prev) =>
       prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
     );
-
-    // Call API if it's a real backend notification (not a manual one)
     if (notification.id.startsWith("notif_")) {
         try {
             await notificationConfig.NOTIFICATION_READ(notification.originalId);
@@ -267,7 +255,6 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
     }
   };
 
-  // Handle Friend Request Accept
   const handleAcceptFriend = async (e, notification) => {
     e.stopPropagation();
     if (!notification.friendRequestId) return;
@@ -275,18 +262,15 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
 
     try {
       await notificationConfig.FRIEND_REQUEST_ACCEPT(notification.friendRequestId);
-      // Remove the notification or change text to "Accepted"
       setNotifications(prev => prev.filter(n => n.id !== notification.id));
       alert(`You are now friends with ${notification.author}`);
     } catch (error) {
       console.error("Failed to accept request", error);
-      alert("Error accepting friend request");
     } finally {
       setLoadingAction(null);
     }
   };
 
-  // Handle Friend Request Reject
   const handleRejectFriend = async (e, notification) => {
     e.stopPropagation();
     if (!notification.friendRequestId) return;
@@ -309,11 +293,11 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
   const handleClearAll = () => {
     if (window.confirm("Clear all notifications?")) {
       setNotifications([]);
-      // Optional: Call mark_all_as_read API
       notificationConfig.NOTIFICATION_READ_ALL().catch(console.error);
     }
   };
 
+  // ✅ Updated Styles for new Alert Types
   const getTypeStyle = (type) => {
     const styles = {
       general: "bg-blue-100 text-blue-700",
@@ -323,6 +307,8 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
       urgent: "bg-red-100 text-red-700",
       payment_due: "bg-pink-100 text-pink-700",
       assignment_due: "bg-orange-100 text-orange-800",
+      plagiarism_alert: "bg-amber-100 text-amber-800", // ⚠️ Warning
+      misconduct_alert: "bg-red-100 text-red-800 font-bold", // 🚨 Critical
     };
     return styles[type] || styles.general;
   };
@@ -345,10 +331,7 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
 
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
 
           <div className="absolute right-0 z-50 mt-2 overflow-hidden duration-200 bg-white border border-gray-200 rounded-lg shadow-xl w-80 sm:w-96 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
@@ -380,11 +363,20 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        {/* Icon based on type */}
+                        
+                        {/* ✅ DYNAMIC ICON RENDERING */}
                         <div className="mt-1">
                             {notification.type === 'friend_request' ? (
                                 <div className="p-1.5 bg-purple-100 rounded-full">
                                     <UserPlus className="w-4 h-4 text-purple-600" />
+                                </div>
+                            ) : notification.type === 'misconduct_alert' ? (
+                                <div className="p-1.5 bg-red-100 rounded-full">
+                                    <ShieldAlert className="w-4 h-4 text-red-600" />
+                                </div>
+                            ) : notification.type === 'plagiarism_alert' ? (
+                                <div className="p-1.5 bg-amber-100 rounded-full">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600" />
                                 </div>
                             ) : (
                                 <div className={`w-2 h-2 mt-1.5 rounded-full ${!notification.read ? 'bg-blue-500' : 'bg-gray-300'}`} />
@@ -398,7 +390,7 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
                                 notification.type
                               )}`}
                             >
-                              {String(notification.type).replace("_", " ")}
+                              {String(notification.type).replace(/_/g, " ")}
                             </span>
                             <span className="text-xs text-gray-400">
                               {formatTime(notification.time)}
@@ -407,9 +399,7 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
 
                           <p
                             className={`text-sm leading-snug ${
-                              !notification.read
-                                ? "font-semibold text-gray-900"
-                                : "text-gray-600"
+                              !notification.read ? "font-semibold text-gray-900" : "text-gray-600"
                             }`}
                           >
                             {notification.message}
@@ -422,7 +412,6 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
                             </span>
                           </p>
 
-                          {/* ✅ ACTION BUTTONS FOR FRIEND REQUESTS */}
                           {notification.isActionable && notification.type === 'friend_request' && (
                             <div className="flex gap-2 mt-2">
                                 <button 
@@ -443,7 +432,6 @@ const NotificationBell = forwardRef(({ userId }, ref) => {
                           )}
                         </div>
 
-                        {/* REMOVE BUTTON (X) - Only for non-actionable or read items */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

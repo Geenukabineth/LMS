@@ -1,11 +1,12 @@
-// StudentPaymentHistory.jsx
-import { useState, useEffect } from 'react';
-import { CreditCard, Calendar, Download, CheckCircle, Receipt } from 'lucide-react';
-import authService from '@/context/authService';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Calendar, Download, CheckCircle, Receipt, Loader } from 'lucide-react'; // Added Loader
+import { paymentService } from '@/config/payment.config'; 
 
 function StudentPaymentHistory() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState(null); // ✅ NEW: Track downloading state
+  
   const [stats, setStats] = useState({
     totalSpent: 0,
     totalTransactions: 0,
@@ -18,23 +19,11 @@ function StudentPaymentHistory() {
 
   const fetchPaymentHistory = async () => {
     try {
-
-      const token = authService.getToken();
-      // --- FIX 1: Updated URL to match urls.py 'transaction-list' ---
-      const response = await fetch('http://localhost:8000/payment/transactions/', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Check if data is paginated (Django Rest Framework often returns { count: ..., results: [] })
-        const results = Array.isArray(data) ? data : data.results || [];
-        setPayments(results);
-        calculateStats(results);
-      } else {
-        console.error("Failed to fetch history:", response.status);
-      }
+      setLoading(true);
+      const data = await paymentService.getStudentTransactions();
+      const results = Array.isArray(data) ? data : data.results || [];
+      setPayments(results);
+      calculateStats(results);
     } catch (error) {
       console.error('Error fetching payment history:', error);
     } finally {
@@ -64,17 +53,38 @@ function StudentPaymentHistory() {
   };
 
   const getPaymentMethodIcon = (method) => {
-    // --- FIX 2: Match backend values ('stripe', 'card', etc.) ---
-    if (method === 'stripe' || method === 'card') {
-      return <CreditCard size={20} />;
-    }
     return <CreditCard size={20} />;
   };
 
-  const downloadReceipt = async (paymentId) => {
-    // NOTE: Your urls.py currently DOES NOT have a receipt endpoint. 
-    // You need to add a view for this in backend if you want it to work.
-    alert("Receipt download feature coming soon!"); 
+  // ✅ UPDATED: Download Logic
+  const downloadReceipt = async (paymentId, orderRef) => {
+    try {
+      setDownloadingId(paymentId); // Show loading spinner for this button
+      
+      // 1. Fetch the PDF blob
+      const blob = await paymentService.downloadReceipt(paymentId);
+      
+      // 2. Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // 3. Create a temporary anchor tag to trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      // Set filename (e.g., Receipt-ORDER123.pdf)
+      link.setAttribute('download', `Receipt-${orderRef || paymentId}.pdf`); 
+      
+      // 4. Append, click, and cleanup
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error("Download failed", error);
+      alert("Failed to download receipt. Please try again later.");
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   if (loading) {
@@ -90,11 +100,9 @@ function StudentPaymentHistory() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow-sm">
-        <div className="px-4 py-6 mx-auto max-w-7xl sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold text-gray-900">Payment History</h1>
-          <p className="mt-1 text-gray-600">View all your transactions</p>
+        <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+          <h1 className="text-2xl font-bold text-white uppercase">Payment History</h1>
         </div>
       </div>
 
@@ -105,32 +113,29 @@ function StudentPaymentHistory() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="mb-1 text-sm text-gray-600">Total Spent</p>
-                <p className="text-3xl font-bold text-gray-900">${stats.totalSpent}</p>
+                <p className="text-3xl font-bold text-gray-900">Rs.{stats.totalSpent}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
                 <CreditCard size={24} className="text-green-600" />
               </div>
             </div>
           </div>
-
           <div className="p-6 bg-white rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="mb-1 text-sm text-gray-600">Transactions</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.totalTransactions}</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Receipt size={24} className="text-blue-600" />
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <Receipt size={24} className="text-orange-600" />
               </div>
             </div>
           </div>
-
           <div className="p-6 bg-white rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="mb-1 text-sm text-gray-600">Last Payment</p>
                 <p className="text-lg font-bold text-gray-900">
-                  {/* --- FIX 3: Use 'created_at' from backend --- */}
                   {stats.lastPayment ? formatDate(stats.lastPayment.created_at) : 'N/A'}
                 </p>
               </div>
@@ -157,16 +162,13 @@ function StudentPaymentHistory() {
               {payments.map((payment) => (
                 <div key={payment.id} className="p-6 transition hover:bg-gray-50">
                   <div className="flex items-start justify-between">
-                    {/* Payment Info */}
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-indigo-100 rounded-lg">
-                          {/* --- FIX 4: Use 'payment_method_used' --- */}
                           {getPaymentMethodIcon(payment.payment_method_used)}
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900">
-                             {/* --- FIX 5: Backend sends 'transaction_type', not course_title directly --- */}
                             {payment.transaction_type === 'course_purchase' ? 'Course Purchase' : payment.transaction_type}
                           </h3>
                           <p className="text-sm text-gray-600">
@@ -179,22 +181,19 @@ function StudentPaymentHistory() {
                         <div className="flex items-center gap-4 text-sm text-gray-600">
                           <span className="flex items-center gap-2">
                             <Calendar size={14} />
-                            {/* --- FIX 6: Use 'created_at' --- */}
                             {formatDate(payment.created_at)}
                           </span>
                           <span className="capitalize">
-                            {/* --- FIX 7: Use 'payment_method_used' --- */}
                             Method: {payment.payment_method_used || 'Unknown'}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Payment Amount and Actions */}
                     <div className="text-right">
                       <div className="mb-4">
                         <p className="text-2xl font-bold text-gray-900">
-                          ${parseFloat(payment.amount).toFixed(2)}
+                          Rs.{parseFloat(payment.amount).toFixed(2)}
                         </p>
                         <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
                           payment.status === 'successful' || payment.status === 'completed' 
@@ -206,12 +205,18 @@ function StudentPaymentHistory() {
                         </span>
                       </div>
 
+                      {/* ✅ UPDATED: Download Button with Loading State */}
                       <button
-                        onClick={() => downloadReceipt(payment.id)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition border border-gray-300 rounded-lg hover:bg-gray-50"
+                        onClick={() => downloadReceipt(payment.id, payment.related_order_id)}
+                        disabled={downloadingId === payment.id}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-70 disabled:cursor-not-allowed"
                       >
-                        <Download size={16} />
-                        Receipt
+                        {downloadingId === payment.id ? (
+                          <Loader size={16} className="text-indigo-600 animate-spin" />
+                        ) : (
+                          <Download size={16} />
+                        )}
+                        {downloadingId === payment.id ? 'Downloading...' : 'Receipt'}
                       </button>
                     </div>
                   </div>

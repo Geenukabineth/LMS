@@ -137,7 +137,11 @@ const notificationConfig = {
         const response = await api.get('chat/blocked-users/', { params });
         return response.data;
       },
-        UNBLOCK_USER: async (id) => {
+      BLOCK_USER: async (data) => {
+        const response = await api.post('chat/blocked-users/', data);
+        return response.data;
+    },
+    UNBLOCK_USER: async (id) => {
             const response = await api.post(`chat/blocked-users/${id}/unblock/`);
             return response.data;
     },

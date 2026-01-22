@@ -77,26 +77,9 @@ function Signup() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gradient-to-br from-indigo-50 to-blue-100 sm:px-6 lg:px-8">
+    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gradient-to-br from-orange-50 to-orange-100 sm:px-6 lg:px-8">
       <div className="w-full max-w-2xl space-y-6">
-        <div className="p-6 bg-white border-l-4 border-indigo-600 rounded-lg shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="mb-1 text-lg font-semibold text-gray-900">
-                Are you a Teacher?
-              </h3>
-              <p className="text-sm text-gray-600">
-                Join our teaching team and help shape the future of education
-              </p>
-            </div>
-            <a 
-              href="/TeacherApplication"
-              className="inline-block px-6 py-2 ml-4 font-medium text-center text-white transition-colors bg-indigo-600 rounded-md hover:bg-indigo-700 whitespace-nowrap"
-            >
-              Apply to Teach
-            </a>
-          </div>
-        </div>
+        
 
         <div className="p-8 bg-white rounded-lg shadow-md">
           <h2 className="mb-2 text-3xl font-extrabold text-center text-gray-900">
@@ -142,7 +125,7 @@ function Signup() {
                   id="firstName" 
                   value={firstName} 
                   onChange={(e) => setFirstName(e.target.value)} 
-                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm" 
                   placeholder="John" 
                   required
                 />
@@ -159,7 +142,7 @@ function Signup() {
                   id="lastName" 
                   value={lastName} 
                   onChange={(e) => setLastName(e.target.value)} 
-                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm" 
                   placeholder="Doe" 
                   required
                 />
@@ -178,7 +161,7 @@ function Signup() {
                   id="email" 
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
-                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm" 
                   placeholder="student@example.com" 
                   required
                 />
@@ -195,7 +178,7 @@ function Signup() {
                   id="phone" 
                   value={phone} 
                   onChange={(e) => setPhone(e.target.value)} 
-                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm" 
                   placeholder="+94 71 234 5678" 
                 />
                 {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
@@ -213,7 +196,7 @@ function Signup() {
                   id="password" 
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
-                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm" 
                   placeholder="••••••••" 
                   required
                 />
@@ -230,7 +213,7 @@ function Signup() {
                   id="password2" 
                   value={password2} 
                   onChange={(e) => setPassword2(e.target.value)} 
-                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                  className="relative block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm" 
                   placeholder="••••••••" 
                   required
                 />
@@ -247,7 +230,7 @@ function Signup() {
                 id="semester" 
                 value={semester} 
                 onChange={(e) => setSemester(e.target.value)} 
-                className="relative block w-full px-3 py-2 text-gray-900 bg-white border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="relative block w-full px-3 py-2 text-gray-900 bg-white border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
                 required
               >
                 <option value="">Select Grade/Semester</option>
@@ -272,10 +255,10 @@ function Signup() {
               type="submit" 
               disabled={isSubmitting} 
               onClick={handleSubmit}
-              className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+              className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 ${
                 isSubmitting 
                   ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-indigo-600 hover:bg-indigo-700'
+                  : 'bg-orange-600 hover:bg-orange-700'
               }`}
             >
               {isSubmitting ? 'Creating Account...' : 'Create Student Account'}
@@ -285,7 +268,7 @@ function Signup() {
               Already have an account?{' '}
               <a 
                 href="/" 
-                className="font-medium text-indigo-600 hover:text-indigo-500 hover:underline"
+                className="font-medium text-orange-600 hover:text-orange-500 hover:underline"
               >
                 Login here
               </a>

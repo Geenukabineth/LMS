@@ -3,7 +3,7 @@ import {
   Plus, X, AlertCircle, Loader, Trash2, Clock,
   CheckCircle, XCircle, Edit2, TrendingUp, RefreshCw
 } from 'lucide-react';
-import authService from '@/context/authService';
+import { courseService } from '@/config/course.config'; // ✅ Using courseService
 
 const EnrollmentAccess = ({
   selectedStudent,
@@ -16,7 +16,7 @@ const EnrollmentAccess = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showExtendModal, setShowExtendModal] = useState(false);
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
-  const [token, setToken] = useState(null);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [courses, setCourses] = useState([]);
   const [courseLoading, setCourseLoading] = useState(false);
@@ -24,7 +24,7 @@ const EnrollmentAccess = ({
   const [fetchError, setFetchError] = useState(null);
 
   const [createForm, setCreateForm] = useState({
-    course_id: '', // IMPORTANT: this will hold Course.id (PK)
+    course_id: '',
     enrollment_days: 30,
   });
 
@@ -33,131 +33,57 @@ const EnrollmentAccess = ({
   });
 
   useEffect(() => {
-    const authToken = authService.getToken();
-    setToken(authToken);
-
-    // only fetch when student changes
-    fetchCourses();
-    fetchEnrollments();
+    if (selectedStudent) {
+      fetchCourses();
+      fetchEnrollments();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudent]);
 
-  // ✅ Fetch enrollments for the selected student
-  // Your backend filters using Student.user_id (User id), so we must pass user_id
+  // ✅ Fetch Enrollments
   const fetchEnrollments = async () => {
     if (!selectedStudent) {
       setLocalEnrollments([]);
       return;
     }
 
-    const studentUserId =
-      selectedStudent.user_id ??
-      selectedStudent.user?.id ??
-      selectedStudent.user?.user_id;
-
-    if (!studentUserId) {
-      // fallback: avoid calling wrong id
-      setLocalEnrollments([]);
-      return;
-    }
+    const studentId = selectedStudent.id || selectedStudent.user_id;
+    if (!studentId) return;
 
     try {
       setFetchError(null);
-      const t = authService.getToken();
+      const data = await courseService.getEnrollments({ student_id: studentId });
 
-      const response = await fetch(
-        `http://localhost:8000/Course/enrollments/?student_id=${studentUserId}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${t}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      let enrollmentList = [];
+      if (Array.isArray(data)) enrollmentList = data;
+      else if (data?.results) enrollmentList = data.results;
+      else if (data?.enrollments) enrollmentList = data.enrollments;
 
-      console.log(`📥 Fetching enrollments for student user_id=${studentUserId}`);
-
-      if (response.ok) {
-        const data = await response.json();
-
-        let enrollmentList = [];
-        if (Array.isArray(data)) enrollmentList = data;
-        else if (data.results) enrollmentList = data.results;
-        else if (data.enrollments) enrollmentList = data.enrollments;
-        else if (data.data) enrollmentList = data.data;
-
-        console.log('✅ Enrollments fetched:', enrollmentList);
-        setLocalEnrollments(enrollmentList);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Fetch error:', response.status, errorData);
-        setFetchError(errorData?.detail || errorData?.error || `Failed to fetch enrollments: ${response.status}`);
-        setLocalEnrollments([]);
-      }
+      setLocalEnrollments(enrollmentList);
     } catch (err) {
       console.error('❌ Error fetching enrollments:', err);
-      setFetchError(`Error: ${err.message}`);
+      setFetchError('Failed to fetch enrollments');
       setLocalEnrollments([]);
     }
   };
 
-  // ✅ Fetch available courses
+  // ✅ Fetch Courses
   const fetchCourses = async () => {
     try {
       setCourseLoading(true);
-      const t = authService.getToken();
+      const data = await courseService.getCoursesList();
 
-      let response = await fetch('http://localhost:8000/Course/courses/list/admin/', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${t}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      let courseList = [];
+      if (Array.isArray(data)) courseList = data;
+      else if (data?.results) courseList = data.results;
+      else if (data?.courses) courseList = data.courses;
 
-      if (!response.ok) {
-        response = await fetch('http://localhost:8000/Course/courses/list/', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${t}`,
-            'Content-Type': 'application/json',
-          },
-        });
-      }
+      const normalized = (courseList || []).filter(Boolean).map((c) => ({
+        ...c,
+        _pk: c.id, 
+      }));
 
-      if (!response.ok) {
-        response = await fetch('http://localhost:8000/Course/courses/', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${t}`,
-            'Content-Type': 'application/json',
-          },
-        });
-      }
-
-      if (response.ok) {
-        const data = await response.json();
-
-        let courseList = [];
-        if (Array.isArray(data)) courseList = data;
-        else if (data.results) courseList = data.results;
-        else if (data.courses) courseList = data.courses;
-        else if (data.data) courseList = data.data;
-
-        // Normalize: ensure we have course PK as `id`
-        const normalized = (courseList || []).filter(Boolean).map((c) => ({
-          ...c,
-          _pk: c.id,                 // backend EnrollmentCreateAPIView uses Course.id
-          _publicCourseId: c.course_id, // optional: useful for payment module if needed
-        }));
-
-        console.log('✅ Courses loaded:', normalized);
-        setCourses(normalized);
-      } else {
-        console.error('❌ Failed to fetch courses:', response.statusText);
-        setCourses([]);
-      }
+      setCourses(normalized);
     } catch (err) {
       console.error('❌ Error fetching courses:', err);
       setCourses([]);
@@ -166,69 +92,40 @@ const EnrollmentAccess = ({
     }
   };
 
-  // ✅ Create enrollment
+  // ✅ Create Enrollment
   const handleCreateEnrollment = async () => {
-    if (!createForm.course_id) {
-      alert('Please select a course');
-      return;
-    }
-
-    if (!selectedStudent?.id) {
-      alert('No student selected');
-      return;
-    }
+    if (!createForm.course_id) return alert('Please select a course');
+    if (!selectedStudent?.id) return alert('No student selected');
 
     try {
       setIsLoading(true);
-
-      // IMPORTANT:
-      // - course_id MUST be Course.id (PK) because backend does Course, id=course_id :contentReference[oaicite:3]{index=3}
-      // - student_ids currently expects Student.id because backend does Student, id=int(student_ids[0]) :contentReference[oaicite:4]{index=4}
       const requestBody = {
         course_id: parseInt(createForm.course_id, 10),
         student_ids: [selectedStudent.id],
         enrollment_days: createForm.enrollment_days,
       };
 
-      console.log('📤 Sending enrollment request:', requestBody);
+      const data = await courseService.createEnrollment(requestBody);
 
-      const response = await fetch('http://localhost:8000/Course/enrollments/create/', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        console.error('❌ Response error:', errJson);
-        throw new Error(errJson.error || errJson.detail || errJson.message || 'Failed to create enrollment');
-      }
-
-      const data = await response.json();
-      console.log('✅ Enrollment created:', data);
-
+      alert('Enrollment created successfully!');
       if (data.enrollment) {
         setLocalEnrollments((prev) => [...prev, data.enrollment]);
       }
 
-      alert('Enrollment created successfully!');
       setCreateForm({ course_id: '', enrollment_days: 30 });
       setShowCreateModal(false);
-
       fetchEnrollments();
-      onRefresh?.();
+      if (onRefresh) onRefresh();
+
     } catch (err) {
       console.error('❌ Error creating enrollment:', err);
-      alert(`Error: ${err.message}`);
+      alert(`Error: ${err.response?.data?.error || err.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ✅ Extend enrollment
+  // ✅ Extend Enrollment (Update)
   const handleExtendEnrollment = async () => {
     if (!selectedEnrollment || !extendForm.enrollment_days) {
       alert('Please enter number of days to extend');
@@ -237,24 +134,13 @@ const EnrollmentAccess = ({
 
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `http://localhost:8000/Course/enrollments/${selectedEnrollment.id}/update/`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            enrollment_days: extendForm.enrollment_days,
-          }),
-        }
-      );
+      
+      const payload = {
+        enrollment_days: extendForm.enrollment_days
+      };
 
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || errJson.detail || 'Failed to extend enrollment');
-      }
+      // Calls courseService.updateEnrollment -> PUT /Course/enrollments/{id}/
+      await courseService.updateEnrollment(selectedEnrollment.id, payload);
 
       alert('Enrollment extended successfully!');
       setShowExtendModal(false);
@@ -262,62 +148,43 @@ const EnrollmentAccess = ({
       setExtendForm({ enrollment_days: 30 });
 
       fetchEnrollments();
-      onRefresh?.();
+      if (onRefresh) onRefresh();
+
     } catch (err) {
       console.error('❌ Error extending enrollment:', err);
-      alert(`Error: ${err.message}`);
+      alert(`Error: ${err.response?.data?.error || err.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ✅ Delete enrollment
+  // ✅ Revoke Enrollment (Delete)
   const handleDeleteEnrollment = async (enrollmentId) => {
     if (!window.confirm('Are you sure you want to revoke this enrollment?')) return;
 
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `http://localhost:8000/Course/enrollments/${enrollmentId}/delete/`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to delete enrollment');
+      
+      // Calls courseService.deleteEnrollment -> DELETE /Course/enrollments/{id}/
+      await courseService.deleteEnrollment(enrollmentId);
 
       alert('Enrollment revoked successfully!');
       setLocalEnrollments((prev) => prev.filter((e) => e.id !== enrollmentId));
 
       fetchEnrollments();
-      onRefresh?.();
+      if (onRefresh) onRefresh();
+
     } catch (err) {
       console.error('❌ Error deleting enrollment:', err);
-      alert(`Error: ${err.message}`);
+      alert(`Error: ${err.response?.data?.error || err.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Combine both local and parent enrollments
-  const allEnrollments = [...localEnrollments, ...enrollments];
-
-  // Deduplicate enrollments by course_id
-  const deduplicateEnrollments = (enrollmentList) => {
-    const seen = new Set();
-    return enrollmentList.filter((enrollment) => {
-      const courseId = enrollment.course_id || enrollment.course?.id;
-      if (seen.has(courseId)) return false;
-      seen.add(courseId);
-      return true;
-    });
-  };
-
-  const uniqueEnrollments = deduplicateEnrollments(allEnrollments);
+  // Helper logic for display
+  const combinedEnrollments = [...localEnrollments, ...enrollments];
+  const uniqueEnrollments = Array.from(new Map(combinedEnrollments.map(item => [item.id, item])).values());
 
   const getStatusBadgeColor = (enrollment) => {
     if (enrollment.is_expired) return 'bg-red-100 text-red-800';
@@ -366,14 +233,8 @@ const EnrollmentAccess = ({
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Days Remaining:</span>
-          <span className={`font-medium ${enrollment.is_expired ? 'text-red-600' : 'text-blue-600'}`}>
+          <span className={`font-medium ${enrollment.is_expired ? 'text-red-600' : 'text-orange-600'}`}>
             {enrollment.days_remaining} days
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Access:</span>
-          <span className={`font-medium ${enrollment.has_access ? 'text-green-600' : 'text-red-600'}`}>
-            {enrollment.has_access ? 'Active' : 'Revoked'}
           </span>
         </div>
       </div>
@@ -384,7 +245,7 @@ const EnrollmentAccess = ({
             setSelectedEnrollment(enrollment);
             setShowExtendModal(true);
           }}
-          className="flex-1 px-3 py-2 text-sm font-medium text-blue-600 transition border border-blue-300 rounded-lg hover:bg-blue-50"
+          className="flex-1 px-3 py-2 text-sm font-medium text-orange-600 transition border border-orange-300 rounded-lg hover:bg-orange-50"
         >
           <Edit2 size={16} className="inline mr-2" />
           Extend
@@ -402,48 +263,19 @@ const EnrollmentAccess = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Enrollment Management</h2>
         <div className="flex gap-2">
-          <button
-            onClick={fetchEnrollments}
-            className="flex items-center gap-2 px-4 py-2 text-gray-700 transition bg-gray-100 rounded-lg hover:bg-gray-200"
-            title="Refresh enrollments"
-          >
+          <button onClick={fetchEnrollments} className="flex items-center gap-2 px-4 py-2 text-gray-700 transition bg-gray-100 rounded-lg hover:bg-gray-200">
             <RefreshCw size={20} />
           </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 text-white transition bg-blue-600 rounded-lg hover:bg-blue-700"
-          >
+          <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 text-white transition bg-orange-600 rounded-lg hover:bg-orange-700">
             <Plus size={20} />
             New Enrollment
           </button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="p-4 border border-gray-200 rounded-lg">
-          <p className="text-sm text-gray-600">Total</p>
-          <p className="text-2xl font-bold text-gray-900">{uniqueEnrollments.length}</p>
-        </div>
-        <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-          <p className="text-sm text-gray-600">Active</p>
-          <p className="text-2xl font-bold text-green-600">{activeEnrollments.length}</p>
-        </div>
-        <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
-          <p className="text-sm text-gray-600">Expiring Soon</p>
-          <p className="text-2xl font-bold text-yellow-600">{expiringEnrollments.length}</p>
-        </div>
-        <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-          <p className="text-sm text-gray-600">Expired</p>
-          <p className="text-2xl font-bold text-red-600">{expiredEnrollments.length}</p>
-        </div>
-      </div>
-
-      {/* Errors */}
       {(error || fetchError) && (
         <div className="flex gap-3 p-4 border border-red-200 rounded-lg bg-red-50">
           <AlertCircle className="text-red-600" size={20} />
@@ -451,20 +283,16 @@ const EnrollmentAccess = ({
         </div>
       )}
 
-      {/* Loading / Empty / List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader className="text-blue-600 animate-spin" size={32} />
+          <Loader className="text-orange-600 animate-spin" size={32} />
           <p className="ml-3 text-gray-600">Loading enrollments...</p>
         </div>
-      ) : allEnrollments.length === 0 ? (
+      ) : uniqueEnrollments.length === 0 ? (
         <div className="p-8 text-center border border-gray-200 rounded-lg bg-gray-50">
           <TrendingUp className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-          <p className="mb-4 text-gray-600">No enrollments yet</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-          >
+          <p className="mb-4 text-gray-600">No enrollments found for this student.</p>
+          <button onClick={() => setShowCreateModal(true)} className="px-4 py-2 text-white bg-orange-600 rounded-lg hover:bg-orange-700">
             Create First Enrollment
           </button>
         </div>
@@ -473,13 +301,10 @@ const EnrollmentAccess = ({
           {activeEnrollments.length > 0 && (
             <div>
               <h3 className="flex items-center gap-2 mb-4 text-lg font-semibold text-gray-900">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                Active Enrollments ({activeEnrollments.length})
+                <CheckCircle className="w-5 h-5 text-green-600" /> Active ({activeEnrollments.length})
               </h3>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {activeEnrollments.map((enrollment, index) => (
-                  <EnrollmentCard key={`active-${enrollment.id}-${index}`} enrollment={enrollment} />
-                ))}
+                {activeEnrollments.map((e, i) => <EnrollmentCard key={e.id || i} enrollment={e} />)}
               </div>
             </div>
           )}
@@ -487,13 +312,10 @@ const EnrollmentAccess = ({
           {expiringEnrollments.length > 0 && (
             <div>
               <h3 className="flex items-center gap-2 mb-4 text-lg font-semibold text-gray-900">
-                <Clock className="w-5 h-5 text-yellow-600" />
-                Expiring Soon ({expiringEnrollments.length})
+                <Clock className="w-5 h-5 text-yellow-600" /> Expiring Soon ({expiringEnrollments.length})
               </h3>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {expiringEnrollments.map((enrollment, index) => (
-                  <EnrollmentCard key={`expiring-${enrollment.id}-${index}`} enrollment={enrollment} />
-                ))}
+                {expiringEnrollments.map((e, i) => <EnrollmentCard key={e.id || i} enrollment={e} />)}
               </div>
             </div>
           )}
@@ -501,13 +323,10 @@ const EnrollmentAccess = ({
           {expiredEnrollments.length > 0 && (
             <div>
               <h3 className="flex items-center gap-2 mb-4 text-lg font-semibold text-gray-900">
-                <XCircle className="w-5 h-5 text-red-600" />
-                Expired ({expiredEnrollments.length})
+                <XCircle className="w-5 h-5 text-red-600" /> Expired ({expiredEnrollments.length})
               </h3>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {expiredEnrollments.map((enrollment, index) => (
-                  <EnrollmentCard key={`expired-${enrollment.id}-${index}`} enrollment={enrollment} />
-                ))}
+                {expiredEnrollments.map((e, i) => <EnrollmentCard key={e.id || i} enrollment={e} />)}
               </div>
             </div>
           )}
@@ -519,90 +338,36 @@ const EnrollmentAccess = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-gray-900">Create New Enrollment</h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 transition hover:text-gray-600"
-              >
-                <X size={24} />
-              </button>
+              <h3 className="text-xl font-semibold text-gray-900">Create Enrollment</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
-
-            {selectedStudent && (
-              <div className="p-3 mb-4 rounded-lg bg-blue-50">
-                <p className="text-sm text-gray-600">
-                  Student:{' '}
-                  <span className="font-medium text-gray-900">
-                    {selectedStudent.firstName || selectedStudent.username}{' '}
-                    {selectedStudent.lastName || ''}
-                  </span>
-                </p>
-                <p className="text-xs text-gray-500">Student ID: {selectedStudent.id}</p>
-                {selectedStudent.user_id && (
-                  <p className="text-xs text-gray-500">User ID: {selectedStudent.user_id}</p>
-                )}
-              </div>
-            )}
-
+            
             <div className="space-y-4">
               <div>
                 <label className="block mb-2 text-sm font-medium text-gray-700">Course</label>
-                {courseLoading ? (
-                  <div className="flex items-center gap-2 p-3 text-gray-600">
-                    <Loader size={16} className="animate-spin" />
-                    Loading courses...
-                  </div>
-                ) : courses.length > 0 ? (
-                  <select
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={createForm.course_id}
-                    onChange={(e) => setCreateForm({ ...createForm, course_id: e.target.value })}
-                  >
-                    <option value="">Select a course...</option>
-                    {courses.map((course) => (
-                      <option key={course._pk} value={course._pk}>
-                        {course.title} {course.level ? `- ${course.level}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="p-3 text-sm text-red-600 rounded-lg bg-red-50">
-                    ❌ No courses available. Try refreshing the page.
-                  </div>
-                )}
+                <select 
+                  className="w-full p-3 border border-gray-300 rounded-lg"
+                  value={createForm.course_id}
+                  onChange={(e) => setCreateForm({ ...createForm, course_id: e.target.value })}
+                >
+                  <option value="">Select a course...</option>
+                  {courses.map(c => <option key={c._pk} value={c._pk}>{c.title}</option>)}
+                </select>
               </div>
-
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-700">Enrollment Days</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                <label className="block mb-2 text-sm font-medium text-gray-700">Days</label>
+                <input 
+                  type="number" 
+                  className="w-full p-3 border border-gray-300 rounded-lg"
                   value={createForm.enrollment_days}
-                  onChange={(e) =>
-                    setCreateForm({
-                      ...createForm,
-                      enrollment_days: parseInt(e.target.value, 10) || 30,
-                    })
-                  }
+                  onChange={(e) => setCreateForm({ ...createForm, enrollment_days: e.target.value })}
                 />
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleCreateEnrollment}
-                disabled={isLoading || courses.length === 0}
-                className="flex-1 px-4 py-2 font-medium text-white transition bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Creating...' : 'Create Enrollment'}
-              </button>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 px-4 py-2 font-medium text-gray-700 transition bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                Cancel
-              </button>
+              <button onClick={handleCreateEnrollment} disabled={isLoading} className="flex-1 px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50">Create</button>
+              <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
             </div>
           </div>
         </div>
@@ -614,52 +379,27 @@ const EnrollmentAccess = ({
           <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold text-gray-900">Extend Enrollment</h3>
-              <button
-                onClick={() => setShowExtendModal(false)}
-                className="text-gray-400 transition hover:text-gray-600"
-              >
-                <X size={24} />
-              </button>
+              <button onClick={() => setShowExtendModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
 
-            <div className="p-3 mb-4 rounded-lg bg-blue-50">
-              <p className="text-sm text-gray-600">
-                Course:{' '}
-                <span className="font-medium">
-                  {selectedEnrollment.course?.title || selectedEnrollment.course_title}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600">
-                Current Days Remaining:{' '}
-                <span className="font-medium text-blue-600">{selectedEnrollment.days_remaining}</span>
-              </p>
+            <div className="p-3 mb-4 rounded-lg bg-orange-50">
+              <p className="text-sm text-gray-600">Course: <span className="font-medium">{selectedEnrollment.course?.title || selectedEnrollment.course_title}</span></p>
+              <p className="text-sm text-gray-600">Current Days: <span className="font-medium text-orange-600">{selectedEnrollment.days_remaining}</span></p>
             </div>
 
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700">Extend By (days)</label>
-              <input
-                type="number"
-                min="1"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              <input 
+                type="number" 
+                className="w-full p-3 border border-gray-300 rounded-lg"
                 value={extendForm.enrollment_days}
-                onChange={(e) => setExtendForm({ enrollment_days: parseInt(e.target.value, 10) || 30 })}
+                onChange={(e) => setExtendForm({ enrollment_days: e.target.value })}
               />
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleExtendEnrollment}
-                disabled={isLoading}
-                className="flex-1 px-4 py-2 font-medium text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isLoading ? 'Extending...' : 'Extend Enrollment'}
-              </button>
-              <button
-                onClick={() => setShowExtendModal(false)}
-                className="flex-1 px-4 py-2 font-medium text-gray-700 transition bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                Cancel
-              </button>
+              <button onClick={handleExtendEnrollment} disabled={isLoading} className="flex-1 px-4 py-2 text-white bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50">Extend</button>
+              <button onClick={() => setShowExtendModal(false)} className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
             </div>
           </div>
         </div>

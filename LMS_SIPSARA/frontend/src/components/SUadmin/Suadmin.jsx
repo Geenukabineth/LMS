@@ -40,7 +40,6 @@ export default function AdminDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const [user, setUser] = useState(null);
 
-  // ✅ 1. Fetch User Data
   useEffect(() => {
     try {
       if (typeof authService.getCurrentUser === 'function') {
@@ -175,7 +174,7 @@ export default function AdminDashboard() {
           {activeTab === 'dashboard' && (
             <div className="p-8 space-y-8">
               {/* Welcome Card */}
-              <div className="p-6 text-white rounded-lg bg-gradient-to-r from-blue-600 to-purple-600">
+              <div className="relative p-8 overflow-hidden text-white shadow-lg rounded-2xl bg-gradient-to-r from-orange-600 to-red-600">
                 <h2 className="mb-2 text-2xl font-bold">
                   Welcome back{user ? `, ${user.username || user.name || 'User'}` : ""}!
                 </h2>
@@ -305,13 +304,13 @@ export default function AdminDashboard() {
                     <div className="flex space-x-2">
                       <button 
                         onClick={() => setSelectedPeriod('monthly')} 
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedPeriod === 'monthly' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedPeriod === 'monthly' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                       >
                         Monthly
                       </button>
                       <button 
                         onClick={() => setSelectedPeriod('yearly')} 
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedPeriod === 'yearly' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedPeriod === 'yearly' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                       >
                         Yearly
                       </button>
@@ -373,30 +372,64 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 
                 <div className="p-6 bg-white rounded-lg shadow">
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800">Course Enrollment Status</h3>
-                    <p className="text-sm text-gray-500">Current enrollments (Active)</p>
-                  </div>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={enrollmentData} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800">Course Enrollment Status</h3>
+                  <p className="text-sm text-gray-500">Current enrollments (Active)</p>
+                </div>
+                
+                <div className="w-full h-[350px]"> {/* Increased container height slightly */}
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart 
+                      data={enrollmentData} 
+                      margin={{ top: 20, right: 30, left: 0, bottom: 80 }} // ✅ Increased bottom margin to 80px
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                      
                       <XAxis 
                         dataKey="course" 
                         angle={-45} 
                         textAnchor="end" 
-                        height={80}
+                        height={80} // ✅ Allocated more height for rotated labels
+                        interval={0} // Force show all labels
                         stroke="#6b7280"
-                        tick={{ fontSize: 12 }}
-                        interval={0}
+                        tick={{ fontSize: 11, fill: '#4B5563' }} // Tailwind gray-600
                       />
-                      <YAxis stroke="#6b7280" allowDecimals={false} />
-                      <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
-                      <Legend />
-                      <Bar dataKey="enrolled" fill="#3B82F6" name="Enrolled Students" radius={[4, 4, 0, 0]} />
+                      
+                      <YAxis 
+                        stroke="#6b7280" 
+                        allowDecimals={false} 
+                        tick={{ fontSize: 12, fill: '#4B5563' }}
+                      />
+                      
+                      <Tooltip 
+                        cursor={{ fill: '#F9FAFB' }} // Tailwind gray-50 hover effect
+                        contentStyle={{ 
+                          backgroundColor: '#fff', 
+                          border: '1px solid #e5e7eb', 
+                          borderRadius: '0.5rem', // Tailwind rounded-lg
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' // Tailwind shadow-md
+                        }} 
+                      />
+                      
+                      <Legend 
+                        verticalAlign="top" // ✅ Moved Legend to the top
+                        height={36} 
+                        iconType="circle"
+                        wrapperStyle={{ paddingTop: '0px', paddingBottom: '10px' }}
+                      />
+                      
+                      <Bar 
+                        dataKey="enrolled" 
+                        fill="#3B82F6" // Tailwind blue-500
+                        name="Enrolled Students" 
+                        radius={[4, 4, 0, 0]} 
+                        barSize={40}
+                        activeBar={{ fill: '#2563EB' }} // Darker blue on hover (blue-600)
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-
+              </div>
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-gray-800">Course Distribution by Department</h3>

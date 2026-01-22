@@ -1,15 +1,3 @@
-# backend/notification/signals.py
-"""
-Notification Signals for SIPSARA LMS
-
-This module handles real-time announcements via WebSocket Channels.
-It listens to Announcement model creation and broadcasts to connected users.
-
-User Model Structure (lms/models.py):
-    - user_type: Choices are 'admin', 'student', 'instructor', 'receptionist'
-    - is_superuser/is_staff: Also checked for role determination
-"""
-
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from channels.layers import get_channel_layer

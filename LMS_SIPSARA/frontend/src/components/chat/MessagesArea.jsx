@@ -76,7 +76,7 @@ const MessagesArea = ({ messages = [], selectedChat, currentUserId, onMarkAsRead
             {/* Avatar for received messages */}
             {!isSent && showAvatar && (
               <div className="flex items-end">
-                <div className="flex items-center justify-center flex-shrink-0 w-8 h-8 text-xs font-bold text-white rounded-full bg-gradient-to-br from-blue-400 to-blue-600">
+                <div className="flex items-center justify-center flex-shrink-0 w-8 h-8 text-xs font-bold text-white rounded-full bg-gradient-to-br from-orange-400 to-orange-600">
                   {(message.sender?.full_name  || message.sender?.username || 'U')?.[0]?.toUpperCase()}
                 </div>
               </div>

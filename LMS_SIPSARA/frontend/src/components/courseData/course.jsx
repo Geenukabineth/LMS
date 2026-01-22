@@ -77,7 +77,7 @@ const CourseManagement = () => {
     if (!window.confirm('Are you sure you want to permanently delete this course?')) return;
 
     try {
-      await courseService.deleteCoursesList(id); // Calls API DELETE Course/courses/delete/<id>/
+      await courseService.deleteCoursesList(id); 
       setCourses((prev) => prev.filter((course) => course.id !== id));
       showNotify('Course deleted successfully!', 'success');
     } catch (err) {
@@ -107,14 +107,14 @@ const CourseManagement = () => {
   return (
     <div className="min-h-screen p-8 bg-gray-50">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col items-start justify-between mb-6 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Course Management</h1>
-            <p className="text-gray-600">Manage {courses.length} courses on the platform</p>
+            <h1 className="text-2xl font-bold text-white uppercase">Course Management</h1>
+            <p className="text-white-600">Manage {courses.length} courses on the platform</p>
           </div>
           <button
             onClick={() => { setEditingCourse(null); setShowCourseCreator(true); }}
-            className="flex items-center px-6 py-3 space-x-2 text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg hover:scale-105"
+            className="flex items-center px-6 py-3 space-x-2 text-white transition-all bg-orange-600 shadow-lg rounded-xl hover:bg-orange-700 hover:scale-105"
           >
             <Plus className="w-5 h-5" />
             <span>Create Course</span>
@@ -131,13 +131,13 @@ const CourseManagement = () => {
                 placeholder="Search by title or teacher..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500"
               />
             </div>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="py-2 pl-4 pr-10 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              className="py-2 pl-4 pr-10 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500"
             >
               <option value="all">All Status</option>
               <option value="published">Published</option>
@@ -148,7 +148,7 @@ const CourseManagement = () => {
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-            <Loader2 className="w-10 h-10 mb-4 animate-spin text-blue-600" />
+            <Loader2 className="w-10 h-10 mb-4 text-orange-600 animate-spin" />
             <p>Loading your courses...</p>
           </div>
         ) : error ? (
@@ -160,7 +160,7 @@ const CourseManagement = () => {
             )}
 
             {filteredCourses.map((course) => (
-              <div key={course.id} className="overflow-hidden bg-white border border-gray-200 shadow-md rounded-xl hover:shadow-xl transition-shadow">
+              <div key={course.id} className="overflow-hidden transition-shadow bg-white border border-gray-200 shadow-md rounded-xl hover:shadow-xl">
                 <div className="relative h-48">
                   <img
                     src={course.image || 'https://placehold.co/600x400?text=No+Image'}
@@ -189,14 +189,14 @@ const CourseManagement = () => {
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleEditCourse(course)}
-                        className="p-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                        className="p-2 text-orange-600 transition-colors border border-orange-200 rounded-lg hover:bg-orange-50"
                         title="Edit Course"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteCourse(course.id)}
-                        className="p-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                        className="p-2 text-red-600 transition-colors border border-red-200 rounded-lg hover:bg-red-50"
                         title="Delete Course"
                       >
                         <Trash2 className="w-4 h-4" />

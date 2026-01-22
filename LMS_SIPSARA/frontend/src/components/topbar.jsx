@@ -200,7 +200,7 @@ function Topbar() {
                 <div className="absolute right-0 z-50 w-56 py-2 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg">
                   <div className="px-4 py-3 border-b">
                     <div className="flex items-center space-x-3">
-                      <div className="flex items-center justify-center w-10 h-10 overflow-hidden bg-indigo-500 rounded-full">
+                      <div className="flex items-center justify-center w-10 h-10 overflow-hidden bg-orange-500 rounded-full">
                         {profileImage ? (
                           <img
                             src={profileImage}

@@ -3,10 +3,8 @@ import {
   Plus,
   Play,
   FileText,
-  Clock,
   BarChart3,
   BookOpen,
-  AlertCircle,
   ChevronDown,
   Video,
   Zap,
@@ -26,30 +24,12 @@ const SectionButton = ({ active, icon: Icon, label, onClick }) => (
     onClick={onClick}
     className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition ${
       active
-        ? "bg-blue-600 text-white border-blue-600 shadow"
+        ? "bg-orange-600 text-white border-orange-600 shadow"
         : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
     }`}
   >
     <Icon size={18} />
     <span className="font-semibold">{label}</span>
-  </button>
-);
-
-const QuickAction = ({ icon: Icon, title, desc, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="p-4 text-left transition bg-white border rounded-xl hover:shadow"
-  >
-    <div className="flex items-start gap-3">
-      <div className="p-2 text-blue-600 rounded-lg bg-blue-50">
-        <Icon size={20} />
-      </div>
-      <div>
-        <p className="font-semibold">{title}</p>
-        <p className="text-sm text-gray-500">{desc}</p>
-      </div>
-    </div>
   </button>
 );
 
@@ -116,7 +96,7 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
     if (!courseId) return;
     setLoading(true);
     try {
-      const data = await courseService.getCourseModules(courseId);
+      const data = await courseService.getCourseteacherModules(courseId);
       setCourseDetails(data?.course || null);
       setModules(Array.isArray(data?.modules) ? data.modules : []);
       setExpandedModules({});
@@ -133,7 +113,6 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
     if (!courseId) return;
     setAssessmentsLoading(true);
     try {
-      // Pass 'course' as the second argument to trigger the new service logic
       const [assData, quizData] = await Promise.all([
         courseService.getAssignments(courseId, 'course'),
         courseService.getQuizzes(courseId, 'course')
@@ -173,7 +152,6 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
     try {
       if (type === 'assignment') {
         await courseService.deleteAssignment(id);
-        // Optimistic UI update
         setAssignments(prev => prev.filter(a => a.id !== id));
       } else {
         await courseService.deleteQuiz(id);
@@ -197,9 +175,9 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
     const props = { size: 18, className: "flex-shrink-0" };
     switch (type) {
       case "video": return <Video {...props} className="text-red-500" />;
-      case "quiz": return <BarChart3 {...props} className="text-purple-500" />;
+      case "quiz": return <BarChart3 {...props} className="text-red-500" />;
       case "assignment": return <Zap {...props} className="text-orange-500" />;
-      default: return <FileText {...props} className="text-blue-500" />;
+      default: return <FileText {...props} className="text-orange-500" />;
     }
   };
 
@@ -212,10 +190,10 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
         <div>
           <h4 className="font-semibold text-gray-800">{item.title}</h4>
           <div className="flex gap-3 text-xs text-gray-500">
-             {/* Show related Lesson/Module */}
+             {/* ✅ FIXED: Prevent Object rendering crash */}
              {item.lesson && (
                 <span className="px-2 py-0.5 bg-gray-100 rounded">
-                  Lesson ID: {item.lesson}
+                  Lesson ID: {typeof item.lesson === 'object' ? item.lesson.id : item.lesson}
                 </span>
              )}
              {item.due_date && (
@@ -227,7 +205,7 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
       <div className="flex gap-2">
         <button 
           onClick={() => handleEditAssessment(item, type)}
-          className="p-2 text-gray-500 rounded hover:text-blue-600 hover:bg-blue-50"
+          className="p-2 text-gray-500 rounded hover:text-orange-600 hover:bg-orange-50"
           title="Edit"
           type="button"
         >
@@ -245,13 +223,11 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
     </div>
   );
 
-  // ... (Keep existing ModuleCard and LessonCard components) ...
-
   const ModuleCard = ({ module, index }) => (
     <div className="bg-white rounded shadow">
         <div className="flex justify-between p-4">
             <button onClick={() => setExpandedModules(prev => ({...prev, [module.id]: !prev[module.id]}))} className="flex items-center gap-4 text-left">
-                <div className="flex items-center justify-center w-10 h-10 text-white bg-blue-600 rounded">
+                <div className="flex items-center justify-center w-10 h-10 text-white bg-orange-600 rounded">
                     {index + 1}
                 </div>
                 <div>
@@ -298,7 +274,6 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
     );
   }
 
-  // ✅ Creator View (With Edit Support)
   if (showCreator) {
     return (
       <div className="p-6 mx-auto max-w-7xl">
@@ -317,13 +292,10 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
           </div>
         </div>
         
-        {/* NOTE: Ensure your AssignmentQuizPanel handles the 'editData' prop 
-           to pre-fill form fields (title, due_date, etc.) 
-        */}
         <AssignmentQuizPanel 
           courseId={selectedCourseId} 
           defaultTab={creatorTab} 
-          editData={itemToEdit} // <--- Pass the item to edit
+          editData={itemToEdit}
           onSuccess={closeCreator} 
         />
       </div>
@@ -332,8 +304,9 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
 
   return (
     <div className="p-6 mx-auto max-w-7xl">
-      <h1 className="mb-6 text-3xl font-bold">{propCourseTitle || "Course Manager"}</h1>
-
+      <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+      <h1 className="mb-6 text-2xl font-bold uppercase">{propCourseTitle || "Course Manager"}</h1>
+      </div>
       {/* Course Selector */}
       <div className="p-4 mb-6 bg-white rounded shadow">
         {coursesLoading ? (
@@ -346,7 +319,7 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
                 onClick={() => handleCourseChange(c.id)}
                 className={`px-4 py-2 border rounded-full text-sm font-medium transition ${
                     selectedCourseId === c.id 
-                    ? "bg-blue-600 text-white border-blue-600" 
+                    ? "bg-orange-600 text-white border-orange-600" 
                     : "bg-white text-gray-700 hover:bg-gray-50"
                 }`}
                 type="button"
@@ -370,14 +343,14 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
         <>
            {courseDetails && (
             <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
-              <div className="flex items-center gap-2 p-4 bg-white rounded shadow"><BookOpen className="text-blue-500"/> {courseDetails.level || "Level N/A"}</div>
+              <div className="flex items-center gap-2 p-4 bg-white rounded shadow"><BookOpen className="text-orange-500"/> {courseDetails.level || "Level N/A"}</div>
               <div className="flex items-center gap-2 p-4 bg-white rounded shadow"><Play className="text-green-500"/> {modules.length} Modules</div>
-              <div className="flex items-center gap-2 p-4 bg-white rounded shadow"><FileText className="text-purple-500"/> {courseDetails.language || "Lang N/A"}</div>
+              <div className="flex items-center gap-2 p-4 bg-white rounded shadow"><FileText className="text-red-500"/> {courseDetails.language || "Lang N/A"}</div>
             </div>
           )}
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-bold">Course Modules</h2>
-            <button onClick={() => { setEditModuleId(null); setShowAddContent(true); }} className="flex gap-2 px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700" type="button">
+            <button onClick={() => { setEditModuleId(null); setShowAddContent(true); }} className="flex gap-2 px-4 py-2 text-white bg-orange-600 rounded hover:bg-orange-700" type="button">
               <Plus size={18} /> Add Module
             </button>
           </div>
@@ -387,7 +360,7 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
         </>
       )}
 
-      {/* ✅ Assignments + Quizzes Section */}
+      {/* Assignments + Quizzes Section */}
       {selectedCourseId && activeSection === "assessments" && (
         <div className="space-y-6">
           <div className="p-5 bg-white border rounded-xl">
@@ -407,7 +380,7 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
                   <button
                     type="button"
                     onClick={() => { setItemToEdit(null); setCreatorTab("quiz"); setShowCreator(true); }}
-                    className="px-4 py-2 text-white bg-purple-600 rounded-lg hover:bg-purple-700"
+                    className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
                   >
                     + New Quiz
                   </button>
@@ -445,10 +418,10 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
             {/* Quizzes List */}
             <div className="p-5 bg-white border rounded-xl">
               <h3 className="flex items-center gap-2 mb-4 text-lg font-semibold">
-                <HelpCircle className="text-purple-500" size={20}/> Quizzes
+                <HelpCircle className="text-red-500" size={20}/> Quizzes
               </h3>
               {assessmentsLoading ? (
-                 <div className="flex justify-center p-4"><div className="w-6 h-6 border-b-2 border-purple-500 rounded-full animate-spin"></div></div>
+                 <div className="flex justify-center p-4"><div className="w-6 h-6 border-b-2 border-red-500 rounded-full animate-spin"></div></div>
               ) : quizzes.length > 0 ? (
                 <div className="space-y-3">
                   {quizzes.map(item => (
@@ -457,7 +430,7 @@ const Module = ({ courseId: propCourseId, courseTitle: propCourseTitle }) => {
                       item={item} 
                       type="quiz" 
                       icon={HelpCircle}
-                      colorClass="text-purple-600"
+                      colorClass="text-red-600"
                     />
                   ))}
                 </div>

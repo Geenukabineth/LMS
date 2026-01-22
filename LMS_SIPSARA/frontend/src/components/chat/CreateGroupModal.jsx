@@ -81,7 +81,7 @@ const CreateGroupModal = ({ isOpen, friends, onClose, onCreate, onNotification }
           placeholder="Group name..."
           value={groupName}
           onChange={(e) => setGroupName(e.target.value)}
-          className="w-full px-4 py-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+          className="w-full px-4 py-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
         />
 
         <textarea
@@ -89,7 +89,7 @@ const CreateGroupModal = ({ isOpen, friends, onClose, onCreate, onNotification }
           value={groupDescription}
           onChange={(e) => setGroupDescription(e.target.value)}
           rows="2"
-          className="w-full px-4 py-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+          className="w-full px-4 py-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
         />
 
         <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -109,10 +109,10 @@ const CreateGroupModal = ({ isOpen, friends, onClose, onCreate, onNotification }
                   type="checkbox"
                   checked={selectedMembers.has(friend.id)}
                   onChange={() => handleMemberToggle(friend.id)}
-                  className="w-4 h-4 text-purple-600 rounded"
+                  className="w-4 h-4 text-orange-600 rounded"
                 />
                 <div className="flex items-center flex-1 ml-3 space-x-3">
-                  <div className="flex items-center justify-center w-8 h-8 text-xs font-bold text-white rounded-full bg-gradient-to-br from-purple-400 to-purple-600">
+                  <div className="flex items-center justify-center w-8 h-8 text-xs font-bold text-white rounded-full bg-gradient-to-br from-orange-400 to-orange-600">
                     {(friend.full_name  || friend.username || 'U')?.[0]?.toUpperCase()}
                   </div>
                   <div className="min-w-0">
@@ -132,7 +132,7 @@ const CreateGroupModal = ({ isOpen, friends, onClose, onCreate, onNotification }
         <button
           onClick={handleCreate}
           disabled={!groupName.trim() || selectedMembers.size === 0 || loading}
-          className="flex items-center justify-center w-full gap-2 py-2 font-medium text-white transition bg-purple-600 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="flex items-center justify-center w-full gap-2 py-2 font-medium text-white transition bg-orange-600 rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           {loading && (
             <div className="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin"></div>

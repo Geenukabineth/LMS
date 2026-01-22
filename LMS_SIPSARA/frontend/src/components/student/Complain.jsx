@@ -76,7 +76,7 @@ const Complain = () => {
 
   useEffect(() => {
     loadEnrolledCourses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
   useEffect(() => {
@@ -113,7 +113,7 @@ const Complain = () => {
         title: title.trim(),
         description: description.trim(),
         priority,
-        send_to: "teacher", // Hardcoded to teacher
+        send_to: "teacher", 
       });
 
       setTitle("");
@@ -169,9 +169,9 @@ const Complain = () => {
   return (
     <div className="min-h-screen p-4 bg-gray-50 md:p-6">
       <div className="max-w-6xl mx-auto overflow-hidden bg-white shadow rounded-xl">
-        <div className="p-6 text-white bg-indigo-600">
-          <h1 className="text-2xl font-bold">Student Complaints</h1>
-          <p className="text-sm opacity-90">Manage your course-related issues</p>
+        <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+          <h1 className="text-2xl font-bold uppercase">Student Complaints</h1>
+          
         </div>
 
         {/* Course Selection */}
@@ -185,7 +185,7 @@ const Complain = () => {
                 <div className="text-sm text-gray-500">Loading courses...</div>
               ) : (
                 <select
-                  className="w-full px-4 py-2 bg-white border rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2 bg-white border rounded-lg shadow-sm focus:ring-2 focus:ring-orange-500"
                   value={selectedCourse?.id || ""} 
                   onChange={(e) => {
                     const enrollId = Number(e.target.value);
@@ -220,18 +220,18 @@ const Complain = () => {
         
         <div className="p-6">
            {/* Create Complaint Form */}
-           <div className="p-5 mb-8 border border-indigo-100 bg-indigo-50 rounded-xl">
-            <h2 className="mb-4 text-lg font-bold text-indigo-900">Submit New Complaint</h2>
+           <div className="p-5 mb-8 border border-orange-100 bg-orange-50 rounded-xl">
+            <h2 className="mb-4 text-lg font-bold text-orange-900">Submit New Complaint</h2>
             <div className="mb-4">
               <input 
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
                 placeholder="Subject / Title"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
               />
             </div>
             <textarea 
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
               rows={3}
               placeholder="Describe your issue in detail..."
               value={description}
@@ -253,7 +253,7 @@ const Complain = () => {
               <button 
                 onClick={handleCreate}
                 disabled={loadingComplaints || !selectedCourse}
-                className="px-6 py-2 font-semibold text-white transition-colors bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                className="px-6 py-2 font-semibold text-white transition-colors bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50"
               >
                 {loadingComplaints ? "Sending..." : "Submit Complaint"}
               </button>
@@ -293,7 +293,7 @@ const Complain = () => {
                       <div className="flex gap-2 mt-1 text-xs">
                         <span className={`px-2 py-0.5 rounded-full ${
                           c.status === 'open' ? 'bg-green-100 text-green-700' : 
-                          c.status === 'resolved' ? 'bg-blue-100 text-blue-700' : 
+                          c.status === 'resolved' ? 'bg-orange-100 text-orange-700' : 
                           'bg-gray-100 text-gray-600'
                         }`}>
                           {c.status.toUpperCase()}
@@ -306,7 +306,7 @@ const Complain = () => {
                     <div className="flex gap-2">
                       <button 
                         onClick={() => setEditing(c)}
-                        className="px-3 py-1 text-xs font-medium text-indigo-600 rounded bg-indigo-50 hover:bg-indigo-100"
+                        className="px-3 py-1 text-xs font-medium text-orange-600 rounded bg-orange-50 hover:bg-orange-100"
                       >
                         Edit
                       </button>
@@ -320,9 +320,9 @@ const Complain = () => {
                   </div>
                   <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">{c.description}</p>
                   {c.reply && (
-                    <div className="p-3 mt-4 border border-blue-100 rounded bg-blue-50">
-                      <p className="mb-1 text-xs font-bold text-blue-800 uppercase">Response from {c.send_to}</p>
-                      <p className="text-sm text-blue-900">{c.reply}</p>
+                    <div className="p-3 mt-4 border border-orange-100 rounded bg-orange-50">
+                      <p className="mb-1 text-xs font-bold text-orange-800 uppercase">Response from {c.send_to}</p>
+                      <p className="text-sm text-orange-900">{c.reply}</p>
                     </div>
                   )}
                 </div>
@@ -390,7 +390,7 @@ const Complain = () => {
               </button>
               <button 
                 onClick={handleUpdate}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700"
               >
                 Save Changes
               </button>

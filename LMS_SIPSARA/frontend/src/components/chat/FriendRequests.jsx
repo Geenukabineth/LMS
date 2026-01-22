@@ -67,11 +67,11 @@ const FriendRequests = ({
       {requests.map((request) => (
         <div
           key={request.id}
-          className="p-3 mb-2 border border-blue-200 rounded-lg bg-blue-50"
+          className="p-3 mb-2 border border-orange-200 rounded-lg bg-orange-50"
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center flex-1 min-w-0 space-x-2">
-              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 text-sm font-bold text-white rounded-full bg-gradient-to-br from-blue-400 to-blue-600">
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 text-sm font-bold text-white rounded-full bg-gradient-to-br from-orange-400 to-orange-600">
                 {(request.from_user?.full_name  || request.from_user?.username || 'U')?.[0]?.toUpperCase()}
               </div>
               <div className="min-w-0">

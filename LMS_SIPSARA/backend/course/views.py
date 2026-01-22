@@ -9,7 +9,7 @@ from django.db.models import Q, Count
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from datetime import timedelta
-
+from rest_framework.generics import RetrieveUpdateDestroyAPIView
 from .models import (
     Course, EnrolledCourse, LiveAttendance, Variant, VariantItem, Module, Lesson,
     CompletedLesson, Note, Review, Question_Answer, Question_Answer_Message,LiveSession
@@ -453,11 +453,39 @@ class EnrollmentListAPIView(ListAPIView):
         return queryset.order_by('-date')
 
 
-class EnrollmentDetailAPIView(RetrieveAPIView):
+class EnrollmentDetailAPIView(RetrieveUpdateDestroyAPIView):
     serializer_class = ReceptionistEnrollmentSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'id'
     queryset = EnrolledCourse.objects.select_related('course', 'teacher', 'user', 'user__user')
+
+    # Override update to handle "Extending" enrollment days
+    def update(self, request, *args, **kwargs):
+        enrollment = self.get_object()
+        
+        # Check if we are sending 'enrollment_days' to extend
+        days = request.data.get('enrollment_days')
+        
+        if days:
+            try:
+                days = int(days)
+                # If expired, start extension from NOW. If active, add to existing end date.
+                if enrollment.is_expired:
+                    enrollment.ended_at = timezone.now() + timedelta(days=days)
+                else:
+                    enrollment.ended_at = enrollment.ended_at + timedelta(days=days)
+                
+                enrollment.status = 'active'
+                enrollment.save()
+                
+                # Return updated data
+                serializer = self.get_serializer(enrollment)
+                return Response(serializer.data)
+            except ValueError:
+                return Response({"error": "Invalid days provided"}, status=400)
+
+        # Fallback to standard update for other fields
+        return super().update(request, *args, **kwargs)
 
 
 class EnrollmentCreateAPIView(CreateAPIView):
@@ -828,7 +856,7 @@ class ModuleAPIView(CreateAPIView):
         return Response({"message": "Module deleted"}, status=status.HTTP_200_OK)
     def get(self, request, *args, **kwargs):
     # ✅ accept course_id from URL (/teacher/modules/<course_id>) OR query (?course_id=)
-        course_id = kwargs.get("course_id") or request.query_params.get("course_id")
+        course_id = kwargs.get("course_id") or kwargs.get("module_id") or request.query_params.get("course_id")
         if not course_id:
             return Response({"error": "course_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -949,6 +977,13 @@ class TeacherStudentEnrollmentListAPIView(ListAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+# In backend/course/views.py
+
+# In backend/course/views.py
+
+from django.db.models import Avg, Q  # ✅ Ensure Q is imported
+from django.utils import timezone
+
 class TeacherDashboardStatsAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -958,24 +993,50 @@ class TeacherDashboardStatsAPIView(APIView):
         except Teacher.DoesNotExist:
             return Response({"error": "Teacher profile not found"}, status=404)
 
+        # Get current date and time
+        now = timezone.now()
+        today = now.date()
+        current_time = now.time()
+
         # 1. Total Counts
         total_lessons = Lesson.objects.filter(module__course__teacher=teacher).count()
         total_quizzes = Quiz.objects.filter(lesson__module__course__teacher=teacher).count()
         
-        # 2. Bar Chart Data
+        # 2. Charts & Stats (Existing logic...)
         courses = Course.objects.filter(teacher=teacher)
-        chart_data = []
+        chart_data = []      
+        performance_data = [] 
+
         for course in courses:
             student_count = EnrolledCourse.objects.filter(course=course).count()
+            short_name = course.title[:15] + "..." if len(course.title) > 15 else course.title
+
             chart_data.append({
-                "name": course.title[:15] + "..." if len(course.title) > 15 else course.title,
+                "name": short_name,
                 "students": student_count
             })
 
-        # 3. Upcoming Classes (Live Sessions)
+            assign_avg = AssignmentSubmission.objects.filter(
+                assignment__lesson__module__course=course
+            ).aggregate(avg=Avg('grade'))['avg'] or 0
+
+            quiz_avg = QuizAttempt.objects.filter(
+                quiz__lesson__module__course=course
+            ).aggregate(avg=Avg('score'))['avg'] or 0
+
+            performance_data.append({
+                "name": short_name,
+                "Assignments": round(assign_avg, 1),
+                "Quizzes": round(quiz_avg, 1)
+            })
+
+        # 3. Upcoming Classes (✅ FIXED)
+        # Filter: Must be (Future Date) OR (Today AND Future Time)
         upcoming_sessions = LiveSession.objects.filter(
             course__teacher=teacher, 
             is_completed=False
+        ).filter(
+            Q(date__gt=today) | (Q(date=today) & Q(time__gte=current_time))
         ).order_by('date', 'time')[:5]
         
         upcoming_data = [
@@ -984,7 +1045,6 @@ class TeacherDashboardStatsAPIView(APIView):
                 "name": session.course.title,
                 "topic": session.title,
                 "time": f"{session.date} at {session.time}",
-                # ✅ FIX: Change 'meeting_link' to 'join_url'
                 "link": session.join_url 
             } for session in upcoming_sessions
         ]
@@ -992,10 +1052,11 @@ class TeacherDashboardStatsAPIView(APIView):
         return Response({
             "total_lessons": total_lessons,
             "total_quizzes": total_quizzes,
-            "chart_data": chart_data,
+            "chart_data": chart_data,           
+            "performance_data": performance_data, 
             "upcoming_classes": upcoming_data
         })
-
+    
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from .models import Assignment, Quiz, QuizQuestion, Lesson
 from .serializers import AssignmentSerializer, QuizSerializer, QuizQuestionSerializer
@@ -1007,9 +1068,13 @@ class AssignmentListCreateAPIView(ListCreateAPIView):
 
     def get_queryset(self):
         lesson_id = self.request.query_params.get("lesson")
+        course_id = self.request.query_params.get("course")
         qs = Assignment.objects.all()
         if lesson_id:
             qs = qs.filter(lesson_id=lesson_id)
+
+        if course_id:
+            qs = qs.filter(lesson__module__course_id=course_id)
         return qs
 
     def perform_create(self, serializer):
@@ -1073,9 +1138,12 @@ class QuizListCreateAPIView(ListCreateAPIView):
 
     def get_queryset(self):
         lesson_id = self.request.query_params.get("lesson")
+        course_id = self.request.query_params.get("course")
         qs = Quiz.objects.all()
         if lesson_id:
             qs = qs.filter(lesson_id=lesson_id)
+        if course_id:
+            qs = qs.filter(lesson__module__course_id=course_id)
         return qs
 
     def perform_create(self, serializer):
@@ -1125,6 +1193,12 @@ class QuizQuestionDetailAPIView(RetrieveUpdateDestroyAPIView):
 # ... existing imports ...
 from .models import CompletedLesson
 
+from django.db.models import Avg
+from .models import AssignmentSubmission, QuizAttempt, Student, CompletedLesson # Ensure imports
+
+from django.db.models import Avg, Q
+from .models import AssignmentSubmission, QuizAttempt, Student, CompletedLesson # Ensure imports
+
 class StudentDashboardStatsAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1137,21 +1211,40 @@ class StudentDashboardStatsAPIView(APIView):
         now = timezone.now()
         today = now.date()
 
-        # 1. Active Courses (Existing logic)
+        # --- 1. COURSES & PERFORMANCE (With Avg Score) ---
         enrolled_courses = EnrolledCourse.objects.filter(user=student, status='active')
         courses_data = []
         
         for enrollment in enrolled_courses:
             course = enrollment.course
+            
+            # A. Calculate Progress (Existing Logic)
             total_lessons = Lesson.objects.filter(module__course=course).count()
             completed_count = CompletedLesson.objects.filter(
                 user=request.user, 
                 lesson__module__course=course,
                 completed=True
             ).count()
-            
             progress = (completed_count / total_lessons * 100) if total_lessons > 0 else 0
             
+            # B. Calculate Average Score (Assignments + Quizzes)
+            assign_avg = AssignmentSubmission.objects.filter(
+                student=student,
+                assignment__lesson__module__course=course
+            ).aggregate(avg=Avg('grade'))['avg'] or 0
+
+            quiz_avg = QuizAttempt.objects.filter(
+                student=student,
+                quiz__lesson__module__course=course
+            ).aggregate(avg=Avg('score'))['avg'] or 0
+
+            # Combined Average
+            if assign_avg and quiz_avg:
+                avg_score = (float(assign_avg) + float(quiz_avg)) / 2
+            else:
+                avg_score = float(assign_avg or quiz_avg)
+
+            # C. Next Class Info
             next_session = LiveSession.objects.filter(
                 course=course, 
                 date__gte=today,
@@ -1163,15 +1256,21 @@ class StudentDashboardStatsAPIView(APIView):
                 "name": course.title,
                 "instructor": course.teacher.user.username if course.teacher else "Staff",
                 "progress": round(progress),
+                "avg_score": round(avg_score), # <--- Sending Avg Score
                 "nextClass": f"{next_session.date} at {next_session.time}" if next_session else "No upcoming classes",
                 "color": "blue" 
             })
 
-        # 2. Upcoming Assignments (Existing logic)
+        # --- 2. UPCOMING ASSIGNMENTS (Filtered) ---
+        # Exclude assignments the student has already submitted
+        submitted_ids = AssignmentSubmission.objects.filter(student=student).values_list('assignment_id', flat=True)
+
         assignments = Assignment.objects.filter(
             lesson__module__course__enrolledcourse__user=student,
             lesson__module__course__enrolledcourse__status='active',
             due_date__gte=now
+        ).exclude(
+            id__in=submitted_ids
         ).order_by('due_date')[:5]
 
         assignments_data = [{
@@ -1182,15 +1281,24 @@ class StudentDashboardStatsAPIView(APIView):
             "status": "urgent" if (a.due_date.date() - today).days <= 2 else "normal"
         } for a in assignments]
 
-        # 3. Upcoming/Incomplete Quizzes (✅ NEW CODE)
-        # Fetch quizzes from active courses that are NOT marked as completed by this user
-        quizzes = Quiz.objects.filter(
+        # --- 3. PENDING QUIZZES (Filtered) ---
+        # Exclude quizzes where the student has used all attempts
+        potential_quizzes = Quiz.objects.filter(
             lesson__module__course__enrolledcourse__user=student,
             lesson__module__course__enrolledcourse__status='active'
         ).exclude(
             lesson__completedlesson__user=request.user,
             lesson__completedlesson__completed=True
-        ).order_by('created_at')[:5]
+        ).order_by('created_at')
+
+        valid_quizzes = []
+        for q in potential_quizzes:
+            used_attempts = QuizAttempt.objects.filter(student=student, quiz=q).count()
+            if used_attempts < q.attempts:
+                valid_quizzes.append(q)
+            
+            if len(valid_quizzes) >= 5: 
+                break
 
         quizzes_data = [{
             "id": q.id,
@@ -1198,9 +1306,9 @@ class StudentDashboardStatsAPIView(APIView):
             "course": q.lesson.module.course.title,
             "time_limit": f"{q.time_limit} mins" if q.time_limit else "No limit",
             "attempts": q.attempts
-        } for q in quizzes]
+        } for q in valid_quizzes]
 
-        # 4. Today's Schedule (Existing logic)
+        # --- 4. TODAY'S SCHEDULE (Unchanged) ---
         todays_sessions = LiveSession.objects.filter(
             course__enrolledcourse__user=student,
             course__enrolledcourse__status='active',
@@ -1218,10 +1326,9 @@ class StudentDashboardStatsAPIView(APIView):
         return Response({
             "courses": courses_data,
             "upcoming_assignments": assignments_data,
-            "upcoming_quizzes": quizzes_data, # ✅ Return new data
+            "upcoming_quizzes": quizzes_data,
             "todays_schedule": schedule_data
         })
-# views.py
 
 from .models import AssignmentSubmission, QuizAttempt, Student
 from .serializers import AssignmentSubmissionSerializer, QuizAttemptSerializer
@@ -1342,15 +1449,27 @@ class SubmitAssignmentAPIView(CreateAPIView):
             plagiarism_report=report_data,
             extracted_text=current_text 
         )
+# In views.py
+
 class SubmitQuizAPIView(CreateAPIView):
     serializer_class = QuizAttemptSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
         student = get_object_or_404(Student, user=self.request.user)
-        serializer.save(student=student)
+        quiz = serializer.validated_data.get('quiz')
 
-# --- Grading Views (Teacher) ---
+        # ✅ 1. Check Attempt Limits
+        previous_attempts = QuizAttempt.objects.filter(quiz=quiz, student=student).count()
+        
+        if previous_attempts >= quiz.attempts:
+             raise PermissionDenied({
+                 "detail": "Maximum quiz attempts reached.", 
+                 "code": "attempts_exceeded"
+             })
+
+        # ✅ 2. Save
+        serializer.save(student=student)# --- Grading Views (Teacher) ---
 
 class TeacherGradingListAPIView(ListAPIView):
     # Returns all submissions for a specific course or assignment
@@ -1525,7 +1644,23 @@ class CreateLiveSessionAPIView(APIView):
         except Exception as e:
             return Response({"error": f"Error creating session: {str(e)}"}, status=500)
 
-# --- 2. List Sessions (Unchanged) ---
+class LiveSessionDetailAPIView(RetrieveUpdateDestroyAPIView):
+    serializer_class = LiveSessionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        # Admins can edit/delete anything
+        if user.is_staff:
+            return LiveSession.objects.all()
+        
+        # Teachers can only edit/delete sessions for their own courses
+        try:
+            teacher = Teacher.objects.get(user=user)
+            return LiveSession.objects.filter(course__teacher=teacher)
+        except Teacher.DoesNotExist:
+            return LiveSession.objects.none()
+        
 class LiveSessionListAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1551,7 +1686,6 @@ class LiveSessionListAPIView(APIView):
         sessions = LiveSession.objects.filter(course=course).order_by('-date', '-time')
         return Response(LiveSessionSerializer(sessions, many=True).data)
 
-# --- 3. Join & Mark Attendance (Unchanged) ---
 class MarkAttendanceAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1594,6 +1728,10 @@ class StudentCourseFeedbackListCreateAPIView(APIView):
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+# In views.py
+
+# views.py
+
 class StudentFeedbackDetailAPIView(RetrieveUpdateDestroyAPIView):
     serializer_class = Question_AnswerSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -1601,10 +1739,32 @@ class StudentFeedbackDetailAPIView(RetrieveUpdateDestroyAPIView):
 
     def get_object(self):
         pk = self.kwargs.get('pk')
-        # Ensure the user owns the feedback they are trying to edit/delete
-        qa = get_object_or_404(Question_Answer, pk=pk)
-        if qa.user != self.request.user:
-            raise PermissionDenied("You can only edit or delete your own feedback.")
+        
+        # ✅ FIX: Look up by 'qa_id' instead of 'pk' (id)
+        # The frontend sends the qa_id (e.g. "abc1234"), so we match that field.
+        qa = get_object_or_404(Question_Answer, qa_id=pk)
+        
+        user = self.request.user
+        
+        # 1. Is the user the Student who created it?
+        is_owner = qa.user == user
+        
+        # 2. Is the user an Admin?
+        is_admin = user.is_staff
+        
+        # 3. Is the user the Teacher of this course?
+        is_course_teacher = False
+        try:
+            teacher = Teacher.objects.filter(user=user).first()
+            if teacher and qa.course.teacher == teacher:
+                is_course_teacher = True
+        except:
+            pass
+
+        # Check permissions
+        if not (is_owner or is_admin or is_course_teacher):
+            raise PermissionDenied("You do not have permission to delete this feedback.")
+
         return qa
 
 class StudentFeedbackReplyAPIView(APIView):
@@ -1817,3 +1977,170 @@ class PlagiarismReportListAPIView(ListAPIView):
             return AssignmentSubmission.objects.all().order_by('-submitted_at')
             
         return AssignmentSubmission.objects.none()
+    
+
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from .models import AssignmentSubmission # Assuming you have a Notification model to save history
+from chatroom.models import Notification
+from decimal import Decimal
+from django.db import transaction
+from chatroom.models import Notification  # Ensure this import exists!
+
+class PlagiarismReportActionAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        # 1. Load the Assignment Submission (NOT QuizAttempt)
+        submission = get_object_or_404(AssignmentSubmission, pk=pk)
+        
+        action = request.data.get('action')
+        payload = request.data
+        student_user = submission.student.user
+        
+        notification_msg = ""
+        notif_type = "general"
+        title = "Course Alert"
+
+        try:
+            # 2. Perform the Grading / Action
+            if action == 'dismiss':
+                submission.plagiarism_score = 0
+                # Use Decimal for safe currency/grade math
+                if 'grade' in payload and payload['grade'] is not None:
+                    submission.grade = Decimal(str(payload['grade']))
+                submission.save()
+                
+                notification_msg = f"Your report for {submission.assignment.title} has been resolved."
+                title = "Report Dismissed"
+
+            elif action == 'clarify':
+                message = payload.get('message', 'Please clarify your sources.')
+                notification_msg = message
+                notif_type = "general"
+                title = "Clarification Requested"
+
+            elif action == 'misconduct':
+                submission.grade = 0
+                submission.save()
+                notification_msg = "Your assignment has been marked as academic misconduct. Grade set to 0."
+                notif_type = "misconduct_alert"
+                title = "Academic Misconduct"
+
+        except Exception as e:
+            # If saving to DB fails, return error immediately
+            return Response({"error": f"Database Save Failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Handle Notification (Safely)
+        # We use a nested try/except so a notification failure DOES NOT crash the response
+        if notification_msg:
+            try:
+                # A. Save to Database
+                Notification.objects.create(
+                    user=student_user,
+                    actor=request.user,
+                    notification_type=notif_type,
+                    title=title,
+                    message=notification_msg
+                )
+
+                # B. Send via Websocket (Channels)
+                channel_layer = get_channel_layer()
+                if channel_layer:
+                    group_name = f"user_{student_user.id}"
+                    async_to_sync(channel_layer.group_send)(
+                        group_name,
+                        {
+                            "type": "send_notification",
+                            "payload": {
+                                "type": notif_type,
+                                "message": notification_msg,
+                                "title": title,
+                                "course": submission.assignment.lesson.module.course.title,
+                                "timestamp": str(timezone.now())
+                            }
+                        }
+                    )
+            except Exception as e:
+                # Log the error but allow the request to succeed
+                print(f"⚠️ Notification failed to send: {e}")
+
+        return Response({"message": "Action processed successfully"}, status=status.HTTP_200_OK)    
+
+
+class TeacherCourseGradebookAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id):
+        course = get_object_or_404(Course, pk=course_id)
+        
+        # Security: Check if teacher owns course
+        if not request.user.is_staff:
+            try:
+                teacher = Teacher.objects.get(user=request.user)
+                if course.teacher != teacher:
+                    return Response({"error": "Unauthorized"}, status=403)
+            except:
+                return Response({"error": "Unauthorized"}, status=403)
+
+        # 1. Get Assessments (Columns)
+        assignments = Assignment.objects.filter(lesson__module__course=course).order_by('created_at')
+        quizzes = Quiz.objects.filter(lesson__module__course=course).order_by('created_at')
+        
+        columns = []
+        for a in assignments:
+            columns.append({"id": f"assign_{a.id}", "title": a.title, "type": "Assignment", "max": a.points, "obj_id": a.id})
+        for q in quizzes:
+            columns.append({"id": f"quiz_{q.id}", "title": q.title, "type": "Quiz", "max": 100, "obj_id": q.id})
+
+        # 2. Get Students (Rows)
+        enrollments = EnrolledCourse.objects.filter(course=course, status='active').select_related('user', 'user__user')
+        students = [e.user for e in enrollments]
+
+        # 3. Get Grades
+        submissions = AssignmentSubmission.objects.filter(assignment__in=assignments, student__in=students).values('student_id', 'assignment_id', 'grade')
+        attempts = QuizAttempt.objects.filter(quiz__in=quizzes, student__in=students).values('student_id', 'quiz_id', 'score')
+
+        sub_map = {(x['student_id'], x['assignment_id']): x['grade'] for x in submissions}
+        quiz_map = {(x['student_id'], x['quiz_id']): x['score'] for x in attempts}
+
+        rows = []
+        for student in students:
+            student_name = student.user.username            
+            grades = {}
+            for col in columns:
+                if col['type'] == 'Assignment':
+                    grades[col['id']] = sub_map.get((student.id, col['obj_id']))
+                else:
+                    grades[col['id']] = quiz_map.get((student.id, col['obj_id']))
+            
+            rows.append({
+                "student": { "id": student.id, "name": student_name, "email": student.user.email },
+                "grades": grades
+            })
+
+        return Response({ "course_title": course.title, "columns": columns, "rows": rows })
+    
+
+class AdminAllComplaintListAPIView(ListAPIView):
+    """
+    Returns ALL complaints system-wide.
+    Only accessible by Admin (is_staff).
+    """
+    serializer_class = ComplaintSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return Complaint.objects.all().order_by('-created_at')
+
+
+class AdminAllFeedbackListAPIView(ListAPIView):
+    """
+    Returns ALL Feedback (Q&A) system-wide.
+    Only accessible by Admin (is_staff).
+    """
+    serializer_class = Question_AnswerSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return Question_Answer.objects.all().order_by('-date')

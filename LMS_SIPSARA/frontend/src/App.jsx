@@ -13,6 +13,7 @@ import TeacherApplication from "@/components/pages/TeacherApplication";
 import CourseDetailView from "@/components/courseData/Coursedetailview ";
 import QuizAttemptView from "@/components/student/QuizAttemptView";
 import AssignmentView from "@/components/student/AssignmentView";
+import GradingScreen from "@/components/admin/GradingScreen";
 
 
 function App() {
@@ -53,11 +54,13 @@ function App() {
         <Route path="/student/course/:courseId/quiz/:quizId" element={<QuizAttemptView />} />
       </Route>
       <Route element={<ProtectedRouter allowedRoles={['student']} />}>
-        <Route path="/student/course/:courseId/assignment/:assignmentId" element={<AssignmentView />} />
-        
-      </Route>
+        <Route path="/student/course/:courseId/assignment/:assignmentId" element={<AssignmentView />} />        
+      </Route>      
+      <Route element={<ProtectedRouter allowedRoles={['instructor']} />}>
+      <Route path="/teacher/courses/:courseId/gradebook" element={<GradingScreen />} />
+    </Route>
 
-      {/* ---------------------------------------------------- */}
+      
       
     </Routes>
   );

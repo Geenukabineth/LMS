@@ -62,11 +62,11 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-lg">
         {step === 1 ? (
           <form onSubmit={handleSendOtp}>
-            <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Forgot Password</h2>
+            <h2 className="mb-6 text-2xl font-bold text-center text-gray-800">Forgot Password</h2>
             <div className="mb-4">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email Address</label>
               <input
@@ -74,14 +74,14 @@ const ForgotPassword = () => {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 p-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                 placeholder="Enter your email"
                 required
               />
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              className="w-full p-2 text-white bg-orange-600 rounded-md hover:bg-orange-700 disabled:bg-orange-300"
               disabled={loading}
             >
               {loading ? 'Sending...' : 'Send OTP'}
@@ -94,7 +94,7 @@ const ForgotPassword = () => {
           </form>
         ) : (
           <form onSubmit={handleResetPassword}>
-            <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Verify OTP and Reset Password</h2>
+            <h2 className="mb-6 text-2xl font-bold text-center text-gray-800">Verify OTP and Reset Password</h2>
             <div className="mb-4">
               <label htmlFor="otp" className="block text-sm font-medium text-gray-700">OTP</label>
               <input
@@ -102,7 +102,7 @@ const ForgotPassword = () => {
                 id="otp"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                className="mt-1 p-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                 placeholder="Enter OTP"
                 required
               />
@@ -114,7 +114,7 @@ const ForgotPassword = () => {
                 id="newPassword"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="mt-1 p-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                 placeholder="New Password"
                 required
               />
@@ -126,14 +126,14 @@ const ForgotPassword = () => {
                 id="confirmPassword"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 p-2 w-full border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 mt-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                 placeholder="Confirm New Password"
                 required
               />
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              className="w-full p-2 text-white bg-orange-600 rounded-md hover:bg-orange-700 disabled:bg-orange-300"
               disabled={loading}
             >
               {loading ? 'Resetting...' : 'Reset Password'}

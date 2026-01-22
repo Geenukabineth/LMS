@@ -1,6 +1,7 @@
 import os
 import PyPDF2
 import docx
+import re
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -115,3 +116,47 @@ def check_plagiarism(new_text, previous_texts):
         print(f"Internal Check Error: {e}")
 
     return {"score": 0.0, "matched_text": ""}
+
+def grade_essay_ml(student_answer, model_answer, keywords=None):
+    
+    if not student_answer or not model_answer:
+        return 0.0
+
+    score = 0.0
+    
+    def clean(text):
+        return re.sub(r'\s+', ' ', text).strip().lower()
+
+    text1 = clean(student_answer)
+    text2 = clean(model_answer)
+
+    try:
+        documents = [text1, text2]
+        tfidf_vectorizer = TfidfVectorizer(stop_words='english')
+        tfidf_matrix = tfidf_vectorizer.fit_transform(documents)
+        similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+        
+        similarity_score = float(similarity) * 100
+    except Exception as e:
+        print(f"ML Grading Error: {e}")
+        similarity_score = 0
+
+    # 3. KEYWORD MATCHING (30% weight)
+    keyword_score = 0
+    if keywords and isinstance(keywords, list) and len(keywords) > 0:
+        found_count = 0
+        for word in keywords:
+            if word.lower() in text1:
+                found_count += 1
+        
+        # Calculate percentage of keywords found
+        keyword_score = (found_count / len(keywords)) * 100
+        
+        # Weighted Final Score: 60% Similarity + 40% Keywords
+        final_score = (similarity_score * 0.6) + (keyword_score * 0.4)
+    else:
+        # If no keywords provided, rely 100% on similarity
+        final_score = similarity_score
+
+    # Cap score at 100
+    return min(round(final_score, 1), 100)

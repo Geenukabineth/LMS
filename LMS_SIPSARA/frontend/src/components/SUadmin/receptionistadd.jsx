@@ -142,30 +142,30 @@ const ReceptionistManagementPanel = () => {
   }) : [];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8 mx-auto max-w-7xl">
       {success && (
-        <div className="p-4 mb-4 text-green-700 bg-green-100 rounded-lg flex justify-between items-center border border-green-200">
+        <div className="flex items-center justify-between p-4 mb-4 text-green-700 bg-green-100 border border-green-200 rounded-lg">
           <span>{success}</span>
           <button onClick={() => setSuccess(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
-        <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
-          <h2 className="text-2xl font-bold text-gray-800">Receptionists</h2>
-          <div className="flex items-center gap-3 w-full md:w-auto">
+      <div className="overflow-hidden bg-white border border-gray-100 shadow-lg rounded-xl">
+        <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+          <h2 className="text-2xl font-bold text-white uppercase">Receptionists</h2>
+          <div className="flex items-center w-full gap-3 md:w-auto">
              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute w-4 h-4 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
                 <input 
                   type="text" 
                   placeholder="Search..." 
-                  className="pl-10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full py-2 pl-10 pr-4 text-black border rounded-lg outline-none focus:ring-2 focus:ring-orange-500"
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
              </div>
-            <button onClick={() => setShowModal(true)} className="flex items-center px-4 py-2 space-x-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+            <button onClick={() => setShowModal(true)} className="flex items-center px-4 py-2 space-x-2 text-white transition-colors bg-orange-600 rounded-lg hover:bg-red-600">
               <Plus className="w-5 h-5" />
-              <span>Add</span>
+              <span>Add Reception</span>
             </button>
           </div>
         </div>
@@ -175,15 +175,15 @@ const ReceptionistManagementPanel = () => {
             <thead className="bg-gray-50">
               <tr>
                 {['Full Name', 'Gender', 'Email', 'Phone', 'Status', 'Actions'].map((h) => (
-                  <th key={h} className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase text-left">{h}</th>
+                  <th key={h} className="px-6 py-3 text-xs font-semibold text-left text-gray-500 uppercase">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
-                <tr><td colSpan="6" className="text-center py-10 text-gray-400">Loading...</td></tr>
+                <tr><td colSpan="6" className="py-10 text-center text-gray-400">Loading...</td></tr>
               ) : filteredReceptionists.map((receptionist, index) => (
-                <tr key={receptionist.id || index} className="hover:bg-gray-50 transition-colors">
+                <tr key={receptionist.id || index} className="transition-colors hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium">{receptionist.First_Name} {receptionist.Last_Name}</td>
                   <td className="px-6 py-4 text-sm capitalize">{receptionist.gender}</td>
                   <td className="px-6 py-4 text-sm">{receptionist.Email_Address}</td>
@@ -193,12 +193,12 @@ const ReceptionistManagementPanel = () => {
                       {receptionist.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm flex space-x-3">
-                    <button onClick={() => handleEdit(receptionist.id)} className="p-1 hover:bg-blue-50 rounded text-blue-600 transition-colors"><Edit3 className="w-4 h-4" /></button>
+                  <td className="flex px-6 py-4 space-x-3 text-sm">
+                    <button onClick={() => handleEdit(receptionist.id)} className="p-1 text-orange-600 transition-colors rounded hover:bg-orange-50"><Edit3 className="w-4 h-4" /></button>
                     {/* FIXED: OnClick only sets the state and opens modal */}
                     <button 
                       onClick={() => { setUserToDelete(receptionist.id); setShowDeleteModal(true); }} 
-                      className="p-1 hover:bg-red-50 rounded text-red-600 transition-colors"
+                      className="p-1 text-red-600 transition-colors rounded hover:bg-red-50"
                     >
                       <Trash className="w-4 h-4" />
                     </button>
@@ -213,25 +213,25 @@ const ReceptionistManagementPanel = () => {
       {/* DELETE CONFIRMATION MODAL */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+          <div className="w-full max-w-sm p-6 text-center bg-white shadow-2xl rounded-xl">
             <div className="flex justify-center mb-4">
-              <div className="p-3 bg-red-100 rounded-full text-red-600">
+              <div className="p-3 text-red-600 bg-red-100 rounded-full">
                 <AlertTriangle className="w-8 h-8" />
               </div>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Are you sure?</h3>
-            <p className="text-gray-500 mb-6">This will permanently delete the receptionist record. This action cannot be undone.</p>
+            <h3 className="mb-2 text-xl font-bold text-gray-900">Are you sure?</h3>
+            <p className="mb-6 text-gray-500">This will permanently delete the receptionist record. This action cannot be undone.</p>
             <div className="flex space-x-3">
               <button 
                 onClick={() => { setShowDeleteModal(false); setUserToDelete(null); }} 
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmDelete}
                 disabled={submitting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {submitting ? 'Deleting...' : 'Yes, Delete'}
               </button>
@@ -242,34 +242,34 @@ const ReceptionistManagementPanel = () => {
 
       {/* ADD/EDIT MODAL */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-            <div className="p-6 border-b flex justify-between items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white shadow-2xl rounded-xl">
+            <div className="flex items-center justify-between p-6 border-b">
               <h3 className="text-lg font-bold">{editingId ? 'Edit' : 'Add'} Receptionist</h3>
-              <button onClick={closeModal} className="hover:bg-gray-100 p-1 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+              <button onClick={closeModal} className="p-1 transition-colors rounded-full hover:bg-gray-100"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
-              {error && <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{error}</div>}
+              {error && <div className="p-3 text-sm text-red-600 border border-red-100 rounded-lg bg-red-50">{error}</div>}
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase">First Name</label>
-                  <input name="firstName" value={formData.firstName} onChange={handleInputChange} required className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input name="firstName" value={formData.firstName} onChange={handleInputChange} required className="w-full p-2 mt-1 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase">Last Name</label>
-                  <input name="lastName" value={formData.lastName} onChange={handleInputChange} required className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input name="lastName" value={formData.lastName} onChange={handleInputChange} required className="w-full p-2 mt-1 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
                 </div>
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase">Username (Auto-generated)</label>
-                <input name="username" value={formData.username} readOnly className="w-full mt-1 p-2 border rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
+                <input name="username" value={formData.username} readOnly className="w-full p-2 mt-1 text-gray-500 border rounded-lg cursor-not-allowed bg-gray-50" />
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase">Gender</label>
-                <select name="gender" value={formData.gender} onChange={handleInputChange} required className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                <select name="gender" value={formData.gender} onChange={handleInputChange} required className="w-full p-2 mt-1 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500">
                   <option value="">Select gender</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
@@ -278,17 +278,17 @@ const ReceptionistManagementPanel = () => {
 
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase">Email</label>
-                <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className="w-full p-2 mt-1 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase">Phone</label>
-                <input type="tel" name="Phone_Number" value={formData.Phone_Number} onChange={handleInputChange} required className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <input type="tel" name="Phone_Number" value={formData.Phone_Number} onChange={handleInputChange} required className="w-full p-2 mt-1 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4 border-t">
+              <div className="flex justify-end pt-4 space-x-3 border-t">
                 <button type="button" onClick={closeModal} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                <button type="submit" disabled={submitting} className="flex items-center gap-2 px-6 py-2 text-white bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50">
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   {editingId ? 'Update' : 'Register'}
                 </button>

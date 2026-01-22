@@ -1,41 +1,50 @@
 import React, { useMemo, useState } from "react";
 import { X, DollarSign, Loader, AlertCircle, CheckCircle } from "lucide-react";
-import authService from "@/context/authService";
+// ✅ REMOVED: authService import
+import { paymentService } from "@/config/payment.config"; // ✅ ADDED: paymentService
 
-/**
- * Addpayment
- * - student_id MUST be the AUTH USER id (selectedStudent.user_id)
- * - course_id MUST be the course.course_id value (not Course.id)
- */
 const Addpayment = ({
   selectedStudent,
   paymentForm,
   setPaymentForm,
   setShowPaymentModal,
   onSuccess,
-  courseContext = null, // { course_id, title }
+  courseContext = null,
 }) => {
-  const token = authService.getToken();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
+  // ✅ FIXED: Robustly find the User ID (fixes "Student user_id missing" error)
   const studentUserId = useMemo(() => {
-    // IMPORTANT: payments are tied to Django User.id
-    return selectedStudent?.user_id ?? null;
+    if (!selectedStudent) return null;
+    // 1. Check direct 'user_id' (common in flat objects)
+    if (selectedStudent.user_id) return selectedStudent.user_id;
+    // 2. Check nested 'user' object (e.g. { user: { id: 1 } })
+    if (selectedStudent.user && typeof selectedStudent.user === 'object' && selectedStudent.user.id) {
+      return selectedStudent.user.id;
+    }
+    // 3. Check 'user' as direct ID (e.g. { user: 1 })
+    if (selectedStudent.user && (typeof selectedStudent.user === 'number' || typeof selectedStudent.user === 'string')) {
+      return selectedStudent.user;
+    }
+    return null;
   }, [selectedStudent]);
 
   const courseId = useMemo(() => {
-    // IMPORTANT: your backend expects Course.course_id
     return courseContext?.course_id ?? null;
   }, [courseContext]);
 
   const studentName = useMemo(() => {
     if (!selectedStudent) return "Unknown";
-    if (selectedStudent.firstName || selectedStudent.lastName) {
-      return `${selectedStudent.firstName || ""} ${selectedStudent.lastName || ""}`.trim();
+    // Check nested user object for names if not found on root
+    const firstName = selectedStudent.firstName || selectedStudent.user?.firstName || "";
+    const lastName = selectedStudent.lastName || selectedStudent.user?.lastName || "";
+    
+    if (firstName || lastName) {
+      return `${firstName} ${lastName}`.trim();
     }
-    return selectedStudent.name || selectedStudent.username || "Unknown";
+    return selectedStudent.name || selectedStudent.username || selectedStudent.user?.username || "Unknown";
   }, [selectedStudent]);
 
   const courseLabel = useMemo(() => {
@@ -45,8 +54,14 @@ const Addpayment = ({
 
   const validate = () => {
     if (!selectedStudent) return setError("No student selected"), false;
-    if (!studentUserId) return setError("Student user_id missing (needed for payment)"), false;
-    if (!courseId) return setError("course_id missing (select a course first)"), false;
+    
+    // Debug log to help you if it fails again
+    if (!studentUserId) {
+      console.error("❌ AddPayment Error: User ID not found in object:", selectedStudent);
+      return setError("Student user_id missing (Check console for object structure)"), false;
+    }
+    
+    if (courseContext && !courseId) return setError("course_id missing (Course context provided but invalid)"), false;
     if (!paymentForm.date) return setError("Please select a payment date"), false;
 
     const amount = Number(paymentForm.amount ?? 0);
@@ -70,33 +85,24 @@ const Addpayment = ({
       setError(null);
 
       const payload = {
-        student_id: Number(studentUserId),     // ✅ USER id
-        course_id: Number(courseId),           // ✅ course.course_id
+        student_id: Number(studentUserId),
         amount: Number(paymentForm.amount ?? 0),
         payment_method: paymentForm.method,
         payment_date: paymentForm.date,
         notes: paymentForm.notes || "",
       };
 
-      console.log("📤 record-payment payload:", payload);
-
-      const res = await fetch("http://localhost:8000/payment/record-payment/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.error || data.message || "Failed to record payment");
+      if (courseId) {
+        payload.course_id = Number(courseId);
       }
 
-      setSuccess(true);
+      console.log("📤 record-payment payload:", payload);
 
+      // ✅ CHANGED: Use paymentService instead of raw fetch
+      // The service/api instance handles the token automatically
+      const data = await paymentService.recordManualPayment(payload);
+
+      setSuccess(true);
       if (onSuccess) onSuccess(data);
 
       setTimeout(() => {
@@ -105,7 +111,9 @@ const Addpayment = ({
       }, 800);
     } catch (err) {
       console.error("❌ Payment error:", err);
-      setError(err.message || "Payment failed");
+      // Handle axios errors (err.response.data) or standard errors
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || "Payment failed";
+      setError(msg);
     } finally {
       setIsProcessing(false);
     }
@@ -155,8 +163,10 @@ const Addpayment = ({
 
         <div className="p-3 mb-4 border border-blue-200 rounded-lg bg-blue-50">
           <div className="text-sm font-medium text-gray-900">{studentName}</div>
-          <div className="text-xs text-gray-500">Student ID: {selectedStudent.id}</div>
-          <div className="text-xs text-gray-500">User ID (for payments): {studentUserId ?? "N/A"}</div>
+          <div className="text-xs text-gray-500">Student Profile ID: {selectedStudent.id}</div>
+          <div className="text-xs text-gray-500">
+             User ID (Payment Ref): <span className="font-mono">{studentUserId ?? "MISSING"}</span>
+          </div>
           {courseContext && <div className="pt-1 text-xs font-medium text-gray-700">For: {courseLabel}</div>}
         </div>
 

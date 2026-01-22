@@ -107,12 +107,74 @@ class CourseSerializer(serializers.ModelSerializer):
             return False
 
 
+# serializers.py
+import re # Add this at the top
+
 class LessonSerializer(serializers.ModelSerializer):
+
+    user_score = serializers.SerializerMethodField()
     class Meta:
         model = Lesson
         fields = '__all__'
         read_only_fields = ['lesson_id', 'date']
 
+    def get_user_score(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        try:
+            student = Student.objects.get(user=request.user)
+            
+            # Check for Quiz Score
+            if obj.content_type == "quiz" and hasattr(obj, 'quiz'):
+                # Get best or latest attempt
+                attempt = obj.quiz.quiz_attempts.filter(student=student).order_by('-score').first()
+                if attempt: 
+                    return {
+                        "score": attempt.score, 
+                        "passed": attempt.passed
+                    }
+
+            # Check for Assignment Grade
+            elif obj.content_type == "assignment" and hasattr(obj, 'assignment'):
+                sub = obj.assignment.submissions.filter(student=student).first()
+                if sub and sub.grade is not None:
+                    # Assuming 50 is pass mark, or calculate based on sub.assignment.points
+                    return {
+                        "score": sub.grade, 
+                        "passed": sub.grade >= (obj.assignment.points / 2)
+                    }
+        except Student.DoesNotExist:
+            pass
+
+    # ADD THIS FUNCTION to automatically convert links
+    def validate_content_url_or_text(self, value):
+        if not value:
+            return value
+        
+        # 1. YouTube Logic
+        youtube_regex = (
+            r'(https?://)?(www\.)?'
+            r'(youtube|youtu|youtube-nocookie)\.(com|be)/'
+            r'(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})'
+        )
+        youtube_match = re.match(youtube_regex, value)
+        if youtube_match:
+            video_id = youtube_match.group(6)
+            return f"https://www.youtube.com/embed/{video_id}"
+
+        # 2. Google Drive Logic
+        # Convert /view or /share links to /preview for embedding
+        if "drive.google.com" in value:
+            if "/view" in value:
+                return value.replace("/view", "/preview")
+            if "/share" in value:
+                return value.replace("/share", "/preview")
+            # If it's a raw file ID link, structure might vary, 
+            # but /preview is usually the safe bet for iframes.
+
+        return value
 
 class ModuleSerializer(serializers.ModelSerializer):
     lessons = LessonSerializer(many=True, read_only=True)
@@ -359,6 +421,7 @@ class ReceptionistEnrollmentSerializer(serializers.ModelSerializer):
     student_email = serializers.CharField(source='user.user.email', read_only=True)
     course_id = serializers.IntegerField(source='course.id', read_only=True)
     course_title = serializers.CharField(source='course.title', read_only=True)
+    course_price = serializers.DecimalField(source='course.price', max_digits=12, decimal_places=2, read_only=True)
     teacher_name = serializers.SerializerMethodField()
     is_expired = serializers.SerializerMethodField()
     days_remaining = serializers.SerializerMethodField()
@@ -375,6 +438,7 @@ class ReceptionistEnrollmentSerializer(serializers.ModelSerializer):
             'course_title',
             'student_name',
             'student_email',
+            'course_price',
             'teacher_name',
             'started_at',
             'ended_at',
@@ -447,10 +511,11 @@ class Question_Answer_MessageSerializer(serializers.ModelSerializer):
 class Question_AnswerSerializer(serializers.ModelSerializer):
     messages = Question_Answer_MessageSerializer(many=True, read_only=True)
     profile = ProfileSerializer(read_only=True)
+    course_id = serializers.IntegerField(source='course.id', read_only=True)
 
     class Meta:
         model = Question_Answer
-        fields = ['qa_id', 'title', 'date', 'messages', 'profile']
+        fields = ['qa_id', 'title', 'date', 'messages', 'profile', 'course_id', 'user']
 
 
 class VariantItemSerializer(serializers.ModelSerializer):
@@ -472,10 +537,39 @@ class FileUploadSerializer(serializers.Serializer):
 
 
 
+# In backend/course/serializers.py
+
 class AssignmentSerializer(serializers.ModelSerializer):
+    user_status = serializers.SerializerMethodField() # ✅ Add this
+
     class Meta:
         model = Assignment
         fields = "__all__"
+
+    def get_user_status(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+
+        try:
+            student = Student.objects.get(user=request.user)
+            # Check if submission exists
+            submission = AssignmentSubmission.objects.filter(assignment=obj, student=student).first()
+            
+            # Check for deadline
+            is_past_due = False
+            if obj.due_date and timezone.now() > obj.due_date:
+                is_past_due = True
+
+            return {
+                "is_submitted": submission is not None,
+                "submitted_at": submission.submitted_at if submission else None,
+                "grade": submission.grade if submission else None,
+                "is_past_due": is_past_due,
+                "is_locked": (submission is not None) or is_past_due # 🔒 Lock condition
+            }
+        except Student.DoesNotExist:
+            return None
 
 
 class QuizQuestionSerializer(serializers.ModelSerializer):
@@ -498,13 +592,46 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
         return value
 
 
+# In serializers.py
+
+# ... imports
+from .models import QuizAttempt
+from lms.models import Student # Ensure these are imported
+
 class QuizSerializer(serializers.ModelSerializer):
     questions = QuizQuestionSerializer(many=True, read_only=True)
+    
+    # ✅ New Fields for Lock Logic
+    user_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Quiz
         fields = "__all__"
 
+    def get_user_status(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+
+        try:
+            student = Student.objects.get(user=request.user)
+            # Count previous attempts
+            attempts_count = QuizAttempt.objects.filter(quiz=obj, student=student).count()
+            
+            # Check if passed previously (optional, depends if you lock after passing)
+            has_passed = QuizAttempt.objects.filter(quiz=obj, student=student, passed=True).exists()
+
+            is_locked = attempts_count >= obj.attempts
+            
+            return {
+                "attempts_used": attempts_count,
+                "attempts_allowed": obj.attempts,
+                "is_locked": is_locked,
+                "has_passed": has_passed,
+                "attempts_remaining": max(0, obj.attempts - attempts_count)
+            }
+        except Student.DoesNotExist:
+            return None
 
 # serializers.py
 
@@ -521,6 +648,9 @@ class QuizAttemptAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuizAttemptAnswer
         fields = ['question', 'selected_option', 'text_answer']
+
+# ... existing imports ...
+from .utils import grade_essay_ml # ✅ Import the new function
 
 class QuizAttemptSerializer(serializers.ModelSerializer):
     answers = QuizAttemptAnswerSerializer(many=True, write_only=True)
@@ -540,32 +670,77 @@ class QuizAttemptSerializer(serializers.ModelSerializer):
         
         for ans_data in answers_data:
             question = ans_data['question']
-            selected = ans_data.get('selected_option')
             
-            # Auto-grading logic for MCQ
-            is_correct = False
-            if question.type == 'multiple_choice' or question.type == 'true_false':
+            # 1. Handle MCQ / True/False
+            if question.type in ['multiple_choice', 'true_false', 'image_mcq']:
+                selected = ans_data.get('selected_option')
+                is_correct = False
                 if str(selected).lower() == str(question.correct_answer).lower():
                     is_correct = True
                     earned_points += question.points
-            
+                
+                QuizAttemptAnswer.objects.create(
+                    attempt=attempt,
+                    question=question,
+                    selected_option=selected,
+                    is_correct=is_correct
+                )
+
+            # 2. Handle Matching (Drag & Drop)
+            elif question.type == 'matching':
+                # Matching logic usually handled on frontend, passing score directly or 
+                # strictly comparing JSON strings. Assuming strict match for now:
+                selected = ans_data.get('selected_option') # JSON string from frontend
+                # In matching, 'options' in DB is the correct pairs.
+                # We can check if selected == options (basic check)
+                is_correct = False
+                # Simple string comparison of the JSON arrays
+                if selected == json.dumps(question.options): 
+                    is_correct = True
+                    earned_points += question.points
+
+                QuizAttemptAnswer.objects.create(
+                    attempt=attempt,
+                    question=question,
+                    selected_option=selected,
+                    is_correct=is_correct
+                )
+
+            # ✅ 3. HANDLE ESSAY (ML AUTO GRADING)
+            elif question.type == 'essay':
+                student_text = ans_data.get('text_answer', '')
+                model_answer = question.correct_answer # Teacher's ideal answer
+                
+                # Use 'options' as the list of required keywords
+                keywords = question.options if isinstance(question.options, list) else []
+
+                # Call ML Utility
+                score_percentage = grade_essay_ml(student_text, model_answer, keywords)
+                
+                # Calculate points earned based on percentage
+                points_awarded = (score_percentage / 100) * question.points
+                earned_points += points_awarded
+                
+                # Mark correct if score > 50% (Arbitrary threshold for "Pass")
+                is_correct = score_percentage >= 50
+
+                QuizAttemptAnswer.objects.create(
+                    attempt=attempt,
+                    question=question,
+                    text_answer=student_text,
+                    is_correct=is_correct
+                )
+
             total_points += question.points
-            
-            QuizAttemptAnswer.objects.create(
-                attempt=attempt,
-                question=question,
-                selected_option=selected,
-                is_correct=is_correct
-            )
         
-        # Calculate final score
+        # Calculate final quiz score
         if total_points > 0:
             attempt.score = (earned_points / total_points) * 100
+        
         attempt.passed = attempt.score >= 50 # Example passing grade
         attempt.save()
         
-        return attempt
-    
+        return attempt    
 class LiveSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = LiveSession
@@ -623,9 +798,11 @@ class PlagiarismReportSerializer(serializers.ModelSerializer):
     flaggedAt = serializers.DateTimeField(source='submitted_at', read_only=True)
     riskLevel = serializers.SerializerMethodField()
     score = serializers.FloatField(source='plagiarism_score', read_only=True)
-    status = serializers.SerializerMethodField()
     
-    # Mock evidence structure to prevent frontend crash
+    # ✅ You declared this field correctly...
+    grade = serializers.FloatField(read_only=True) 
+
+    status = serializers.SerializerMethodField()
     evidence = serializers.SerializerMethodField()
     metadata = serializers.SerializerMethodField()
     text = serializers.SerializerMethodField()
@@ -635,14 +812,14 @@ class PlagiarismReportSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'courseCode', 'courseTitle', 'assessmentType', 'assessmentTitle',
             'student', 'submittedAt', 'flaggedAt', 'riskLevel', 'score',
-            'status', 'evidence', 'metadata', 'text'
+            'status', 'evidence', 'metadata', 'text', 'file',
+            'grade'  # ✅ ...BUT YOU MUST ADD IT HERE TO FIX THE ERROR
         ]
 
     def get_assessmentType(self, obj):
         return "Assignment"
 
     def get_student(self, obj):
-        # Format student object as { id: "...", name: "..." }
         return {
             "id": obj.student.user.username,
             "name": getattr(obj.student.user, 'profile', None) and obj.student.user.profile.full_name or obj.student.user.username
@@ -655,10 +832,11 @@ class PlagiarismReportSerializer(serializers.ModelSerializer):
         return "Low"
 
     def get_status(self, obj):
+        if obj.grade is not None:
+            return "Dismissed"
         return "Open" 
 
     def get_evidence(self, obj):
-        # Return empty structure if no specific report exists
         return getattr(obj, 'plagiarism_report', {}) or {
             "internalMatches": [], 
             "externalSources": [],
@@ -671,17 +849,13 @@ class PlagiarismReportSerializer(serializers.ModelSerializer):
         }
 
     def get_text(self, obj):
-        # 1. Get Student Text (from the field we added earlier)
         student_text = obj.extracted_text if obj.extracted_text else "Text content preview unavailable."
-        
-        # 2. Get Match Text (from the JSON report we just updated)
         report = obj.plagiarism_report or {}
         match_text = report.get('matched_source_text', "No significant match found.")
 
-        # 3. Return to Frontend
         return {
             "studentText": student_text, 
-            "matchText": match_text, # ✅ This will now show the text!
+            "matchText": match_text, 
             "studentHighlights": [],
             "matchHighlights": []
         }

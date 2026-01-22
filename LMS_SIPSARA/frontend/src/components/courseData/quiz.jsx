@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  Trash2, FileText, HelpCircle, Upload, Plus, X,
+  Trash2, FileText, HelpCircle, Upload, Plus, X, Edit
 } from "lucide-react";
 import { courseService } from "@/config/course.config";
 
@@ -32,11 +32,11 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
 
   function initQuestionState() {
     return { 
-      type: "multiple_choice", // Options: multiple_choice, image_mcq, matching
+      type: "multiple_choice", // Options: multiple_choice, image_mcq, matching, essay
       question: "", 
       points: 1, 
       options: ["", "", "", ""], 
-      pairs: [{ left: "", right: "" }], // For Matching
+      pairs: [{ left: "", right: "" }], 
       correctAnswer: "", 
       explanation: "",
       image: null 
@@ -46,11 +46,10 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
   // --- 1. Load Modules ---
   const fetchModules = () => {
     if (!courseId) return;
-    courseService.getCourseModules(courseId)
+    courseService.getCourseteacherModules(courseId)
       .then((data) => {
         const mods = Array.isArray(data?.modules) ? data.modules : [];
         setModules(mods);
-        // Pre-select first module if creating new
         if (mods.length > 0 && !selectedModuleId && !editData) {
             setSelectedModuleId(String(mods[0].id));
         }
@@ -66,41 +65,30 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
       const isQuiz = defaultTab === 'quiz';
       setActiveTab(defaultTab);
 
-      // Pre-select module if available
-      if (editData.lesson_id || editData.lesson) {
-          // You might need to fetch the lesson to find module ID, 
-          // or assume it's set if your editData includes module info.
-      }
-
       if (isQuiz) {
         setQuiz({
           title: editData.title || "",
           description: editData.description || "",
           timeLimit: editData.time_limit || 60,
           attempts: editData.attempts || 1,
-          // Format ISO date to datetime-local input string
           dueDate: editData.due_date ? new Date(editData.due_date).toISOString().slice(0, 16) : "",
           shuffleQuestions: editData.shuffle_questions || false,
           questions: [] 
         });
 
-        // Fetch Questions
         courseService.getQuizQuestions(editData.id).then(data => {
             const questions = Array.isArray(data) ? data : data.results || [];
-            
-            // ✅ Map backend snake_case to frontend camelCase
             const formattedQuestions = questions.map(q => ({
                ...q,
-               correctAnswer: q.correct_answer, // Fix for "correct answer not showing"
+               correctAnswer: q.correct_answer,
                pairs: q.type === 'matching' ? q.options : [], 
-               options: q.type !== 'matching' ? q.options : [],
+               options: q.type !== 'matching' && q.type !== 'essay' ? q.options : [],
                _tempId: q.id 
             }));
             setQuiz(prev => ({ ...prev, questions: formattedQuestions }));
           }).catch(err => console.error("Failed to load questions", err));
 
       } else {
-        // Populate Assignment
         setAssignment({
           title: editData.title || "",
           description: editData.description || "",
@@ -112,8 +100,7 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
     }
   }, [editData, defaultTab]);
 
-
-  // --- Logic for Matching/Drag-Drop ---
+  // --- Logic for Question Builder ---
   const handlePairChange = (index, field, value) => {
     const newPairs = [...currentQuestion.pairs];
     newPairs[index][field] = value;
@@ -129,24 +116,28 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
     setCurrentQuestion({ ...currentQuestion, pairs: newPairs });
   };
 
-  // --- Logic for MCQ Options ---
   const handleOptionChange = (index, value) => {
     const newOptions = [...currentQuestion.options];
     newOptions[index] = value;
     setCurrentQuestion({ ...currentQuestion, options: newOptions });
   };
 
-  // --- Add Question to Local List ---
   const addQuestion = () => {
     if (!currentQuestion.question.trim()) {
         alert("Please enter a question text.");
         return;
     }
-
-    // Validation
+    
+    // ✅ Validation Updates
     if (currentQuestion.type === 'matching') {
         if(currentQuestion.pairs.some(p => !p.left || !p.right)) {
             alert("Please fill out all matching pairs.");
+            return;
+        }
+    } else if (currentQuestion.type === 'essay') {
+        // ✅ Validate Model Answer for Essay
+        if (!currentQuestion.correctAnswer.trim()) {
+            alert("Please provide a Model Answer for auto-grading.");
             return;
         }
     } else {
@@ -164,8 +155,6 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
   };
 
   const removeQuestion = async (id) => {
-     // If real ID, we might want to ask confirmation or delete from DB immediately
-     // For now, removing from UI list
     setQuiz(prev => ({ ...prev, questions: prev.questions.filter(q => q._tempId !== id) }));
   };
 
@@ -178,7 +167,6 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
 
     try {
       if (activeTab === "assignment") {
-         // ... Assignment Save Logic (Same as before) ...
          const assignFD = new FormData();
          if(!editData) {
              const lessonFD = new FormData();
@@ -198,9 +186,7 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
          else await courseService.createAssignment(assignFD);
 
       } else {
-         // === QUIZ SAVE LOGIC ===
          let quizId = editData?.id;
-
          const quizPayload = {
             title: quiz.title,
             description: quiz.description,
@@ -224,7 +210,6 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
              quizId = quizRes.id;
          }
 
-         // Save Questions (Loop)
          for (const q of quiz.questions) {
              const qFD = new FormData();
              qFD.append("quiz", quizId);
@@ -233,10 +218,14 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
              qFD.append("points", q.points);
              qFD.append("explanation", q.explanation || "");
 
-             // ✅ STRINGIFY JSON DATA for FormData
+             // ✅ Handle Essay Type
              if (q.type === 'matching') {
                  qFD.append("options", JSON.stringify(q.pairs));
-                 qFD.append("correct_answer", "matching"); // Dummy value required by model
+                 qFD.append("correct_answer", "matching");
+             } else if (q.type === 'essay') {
+                 qFD.append("options", "[]"); // Empty options for essay
+                 // ✅ Send the Model Answer so the backend can use it for ML Grading
+                 qFD.append("correct_answer", q.correctAnswer); 
              } else {
                  qFD.append("options", JSON.stringify(q.options));
                  qFD.append("correct_answer", q.correctAnswer || "");
@@ -246,19 +235,16 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                  qFD.append("image", q.image);
              }
 
-             // Check if it's a NEW question (temp ID) or existing
              if (String(q._tempId).length > 10) { 
                  await courseService.createQuizQuestion(qFD);
              } else {
-                 // For existing questions, usually use PUT. 
-                 // If your backend supports partial update with multipart, use PUT here.
-                 // Otherwise, delete old and create new is a lazy strategy, but PUT is better.
                  await courseService.putQuizQuestion(q._tempId, qFD);
              }
          }
       }
 
       setStatus({ type: "success", msg: "Saved successfully!" });
+      fetchModules();
       if (onSuccess) onSuccess();
 
     } catch (error) {
@@ -269,17 +255,20 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
     }
   };
 
+  // Helper
+  const selectedModule = modules.find(m => String(m.id) === String(selectedModuleId));
+  const existingLessons = selectedModule?.lessons?.filter(l => ['assignment', 'quiz'].includes(l.content_type)) || [];
+
   return (
     <div className="max-w-6xl p-6 mx-auto bg-gray-50">
       <div className={`grid grid-cols-1 gap-6 ${editData ? '' : 'lg:grid-cols-3'}`}>
         
         {/* Main Form Area */}
         <div className={`bg-white rounded-lg shadow-lg ${editData ? 'col-span-1' : 'lg:col-span-2'}`}>
-            <div className="p-6 text-white bg-blue-600 rounded-t-lg">
+            <div className="p-6 text-white bg-orange-600 rounded-t-lg">
                 <h1 className="text-2xl font-bold">{editData ? "Edit Assessment" : "Create Assessment"}</h1>
             </div>
             
-            {/* Module Select (Only for new) */}
             {!editData && (
                 <div className="p-6 border-b">
                     {status.msg && <div className={`p-3 mb-4 rounded ${status.type === 'error' ? 'bg-red-100' : 'bg-green-100'}`}>{status.msg}</div>}
@@ -295,14 +284,14 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                 <button 
                     disabled={!!editData}
                     onClick={() => setActiveTab("assignment")} 
-                    className={`flex-1 py-4 font-semibold ${activeTab === 'assignment' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500'}`}
+                    className={`flex-1 py-4 font-semibold ${activeTab === 'assignment' ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50' : 'text-gray-500'}`}
                 >
                     Assignment
                 </button>
                 <button 
                     disabled={!!editData}
                     onClick={() => setActiveTab("quiz")} 
-                    className={`flex-1 py-4 font-semibold ${activeTab === 'quiz' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500'}`}
+                    className={`flex-1 py-4 font-semibold ${activeTab === 'quiz' ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50' : 'text-gray-500'}`}
                 >
                     Quiz
                 </button>
@@ -320,14 +309,14 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                         <div className="p-4 border rounded bg-gray-50">
                              <label className="block mb-2 text-sm font-semibold">Attachment</label>
                              <input type="file" onChange={e => setAssignment({...assignment, file: e.target.files[0]})} />
-                             {editData?.file && <p className="mt-2 text-xs text-blue-600">Current file: <a href={editData.file} target="_blank" rel="noreferrer">View File</a></p>}
+                             {editData?.file && <p className="mt-2 text-xs text-orange-600">Current file: <a href={editData.file} target="_blank" rel="noreferrer">View File</a></p>}
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        {/* 1. Quiz Settings */}
-                        <div className="p-4 border border-blue-100 rounded bg-blue-50">
-                            <h3 className="mb-3 font-bold text-blue-800">1. Quiz Settings</h3>
+                        {/* Quiz Settings */}
+                        <div className="p-4 border border-orange-100 rounded bg-orange-50">
+                            <h3 className="mb-3 font-bold text-orange-800">1. Quiz Settings</h3>
                             <input type="text" placeholder="Quiz Title" className="w-full p-2 mb-2 border rounded" value={quiz.title} onChange={e => setQuiz({...quiz, title: e.target.value})} />
                             <textarea placeholder="Description" className="w-full p-2 mb-2 border rounded" value={quiz.description} onChange={e => setQuiz({...quiz, description: e.target.value})} />
                             <div className="grid grid-cols-3 gap-2">
@@ -337,7 +326,7 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                             </div>
                         </div>
 
-                        {/* 2. Question Builder */}
+                        {/* Question Builder */}
                         <div className="p-5 bg-white border rounded shadow-sm">
                             <h3 className="mb-4 text-lg font-bold text-gray-800">2. Add Question</h3>
                             
@@ -352,6 +341,8 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                                         <option value="multiple_choice">Multiple Choice</option>
                                         <option value="image_mcq">Image Based MCQ</option>
                                         <option value="matching">Drag & Drop (Matching)</option>
+                                        {/* ✅ Added Essay Option */}
+                                        <option value="essay">Essay (Long Answer)</option>
                                     </select>
                                 </div>
                                 <div className="w-1/4">
@@ -364,7 +355,7 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                                 <textarea placeholder="Question text..." className="w-full p-2 border rounded" value={currentQuestion.question} onChange={e => setCurrentQuestion({...currentQuestion, question: e.target.value})} />
                                 {(currentQuestion.type === 'image_mcq') && (
                                     <div className="mt-2">
-                                        <label className="flex items-center gap-2 p-2 text-sm text-blue-600 border border-blue-200 border-dashed rounded cursor-pointer hover:bg-blue-50 w-fit">
+                                        <label className="flex items-center gap-2 p-2 text-sm text-orange-600 border border-orange-200 border-dashed rounded cursor-pointer hover:bg-orange-50 w-fit">
                                             <Upload size={16}/> {currentQuestion.image ? "Change Image" : "Upload Image"}
                                             <input type="file" className="hidden" accept="image/*" onChange={(e) => setCurrentQuestion({...currentQuestion, image: e.target.files[0]})} />
                                         </label>
@@ -373,47 +364,71 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                                 )}
                             </div>
 
-                            <div className="p-4 mb-4 border rounded bg-gray-50">
-                                {currentQuestion.type === 'matching' ? (
-                                    <div>
-                                        <label className="block mb-2 text-xs font-bold text-gray-500 uppercase">Matching Pairs</label>
-                                        {currentQuestion.pairs.map((pair, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 mb-2">
-                                                <span className="text-gray-400">{idx + 1}.</span>
-                                                <input type="text" placeholder="Left" className="flex-1 p-2 bg-white border rounded" value={pair.left} onChange={(e) => handlePairChange(idx, 'left', e.target.value)} />
-                                                <span className="text-gray-400">➔</span>
-                                                <input type="text" placeholder="Right" className="flex-1 p-2 bg-white border rounded" value={pair.right} onChange={(e) => handlePairChange(idx, 'right', e.target.value)} />
-                                                {idx > 0 && <button onClick={() => removePair(idx)} className="text-red-500"><X size={16}/></button>}
-                                            </div>
-                                        ))}
-                                        <button onClick={addPair} className="flex items-center gap-1 mt-2 text-sm font-semibold text-blue-600 hover:underline"><Plus size={14}/> Add Pair</button>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <label className="block mb-2 text-xs font-bold text-gray-500 uppercase">Options (Select correct)</label>
-                                        {currentQuestion.options.map((opt, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 mb-2">
-                                                <input type="radio" name="correct" checked={currentQuestion.correctAnswer === opt && opt !== ""} onChange={() => setCurrentQuestion({...currentQuestion, correctAnswer: opt})} disabled={!opt} />
-                                                <input type="text" placeholder={`Option ${idx + 1}`} className="flex-1 p-2 bg-white border rounded" value={opt} onChange={(e) => handleOptionChange(idx, e.target.value)} />
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            {/* ✅ NEW: Model Answer Input for Essay (Required for ML Grading) */}
+                            {currentQuestion.type === 'essay' && (
+                                <div className="mb-4">
+                                    <label className="block mb-1 text-xs font-bold text-gray-500 uppercase">
+                                        Model Answer 
+                                    </label>
+                                    <textarea 
+                                        placeholder="Type the ideal answer here. The AI will compare the student's answer to this..." 
+                                        className="w-full p-2 border border-green-200 rounded bg-green-50" 
+                                        rows={3}
+                                        value={currentQuestion.correctAnswer} 
+                                        onChange={(e) => setCurrentQuestion({...currentQuestion, correctAnswer: e.target.value})} 
+                                    />
+                                    <p className="mt-1 text-xs text-gray-400">
+                                        Keywords from this answer will be used to grade the student.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* ✅ Hide options section for Essay type */}
+                            {currentQuestion.type !== 'essay' && (
+                                <div className="p-4 mb-4 border rounded bg-gray-50">
+                                    {currentQuestion.type === 'matching' ? (
+                                        <div>
+                                            <label className="block mb-2 text-xs font-bold text-gray-500 uppercase">Matching Pairs</label>
+                                            {currentQuestion.pairs.map((pair, idx) => (
+                                                <div key={idx} className="flex items-center gap-2 mb-2">
+                                                    <span className="text-gray-400">{idx + 1}.</span>
+                                                    <input type="text" placeholder="Left" className="flex-1 p-2 bg-white border rounded" value={pair.left} onChange={(e) => handlePairChange(idx, 'left', e.target.value)} />
+                                                    <span className="text-gray-400">➔</span>
+                                                    <input type="text" placeholder="Right" className="flex-1 p-2 bg-white border rounded" value={pair.right} onChange={(e) => handlePairChange(idx, 'right', e.target.value)} />
+                                                    {idx > 0 && <button onClick={() => removePair(idx)} className="text-red-500"><X size={16}/></button>}
+                                                </div>
+                                            ))}
+                                            <button onClick={addPair} className="flex items-center gap-1 mt-2 text-sm font-semibold text-orange-600 hover:underline"><Plus size={14}/> Add Pair</button>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="block mb-2 text-xs font-bold text-gray-500 uppercase">Options (Select correct)</label>
+                                            {currentQuestion.options.map((opt, idx) => (
+                                                <div key={idx} className="flex items-center gap-2 mb-2">
+                                                    <input type="radio" name="correct" checked={currentQuestion.correctAnswer === opt && opt !== ""} onChange={() => setCurrentQuestion({...currentQuestion, correctAnswer: opt})} disabled={!opt} />
+                                                    <input type="text" placeholder={`Option ${idx + 1}`} className="flex-1 p-2 bg-white border rounded" value={opt} onChange={(e) => handleOptionChange(idx, e.target.value)} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <button onClick={addQuestion} className="w-full py-2 font-semibold text-white bg-green-600 rounded hover:bg-green-700">+ Add Question</button>
                         </div>
 
-                        {/* 3. Preview */}
+                        {/* Preview */}
                         <div className="space-y-2">
-                           {quiz.questions.length > 0 && <label className="text-sm font-bold text-gray-600">Questions ({quiz.questions.length})</label>}
                            {quiz.questions.map((q, i) => (
                                <div key={i} className="flex items-start justify-between p-3 bg-white border rounded shadow-sm">
                                    <div>
                                        <div className="flex items-center gap-2">
                                            <span className="font-bold text-gray-700">Q{i+1}: {q.question}</span>
-                                           <span className="px-2 py-0.5 text-xs text-white bg-blue-400 rounded-full">{q.type === 'matching' ? 'Matching' : 'MCQ'}</span>
+                                           <span className="px-2 py-0.5 text-xs text-white bg-orange-400 rounded-full">
+                                                {q.type === 'matching' ? 'Matching' : q.type === 'essay' ? 'Essay' : 'MCQ'}
+                                           </span>
                                        </div>
+                                       
                                        <div className="mt-1 ml-4 text-sm text-gray-500">
                                             {q.type === 'matching' ? (
                                                 <div className="grid grid-cols-2 gap-2 mt-1">
@@ -421,6 +436,9 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                                                         <div key={pid} className="p-1 text-xs border rounded bg-gray-50">{p.left} ➔ {p.right}</div>
                                                     ))}
                                                 </div>
+                                            ) : q.type === 'essay' ? (
+                                                // ✅ Essay Preview
+                                                <span className="italic text-gray-400">Model Answer: "{q.correctAnswer}"</span>
                                             ) : (
                                                 <span>Correct: <span className="font-medium text-green-600">{q.correctAnswer || q.correct_answer || "Not selected"}</span></span>
                                             )}
@@ -432,18 +450,40 @@ const AssignmentQuizPanel = ({ courseId, defaultTab = "assignment", editData = n
                         </div>
                     </div>
                 )}
-                <button onClick={saveContent} disabled={loading} className="w-full py-3 mt-6 text-lg font-bold text-white bg-blue-600 rounded hover:bg-blue-700">
+                <button onClick={saveContent} disabled={loading} className="w-full py-3 mt-6 text-lg font-bold text-white bg-orange-600 rounded hover:bg-orange-700">
                     {loading ? "Saving..." : (editData ? "Update Assessment" : "Create Assessment")}
                 </button>
             </div>
         </div>
 
-        {/* Right: Existing List (Only if creating new) */}
+        {/* Right: Existing List */}
         {!editData && (
-            <div className="bg-white rounded-lg shadow-lg h-fit">
+            <div className="overflow-hidden bg-white rounded-lg shadow-lg h-fit">
                 <div className="p-4 border-b bg-gray-50"><h2 className="font-bold">Existing Content</h2></div>
-                <div className="p-4 text-sm text-gray-500">
-                    Select a module to view existing assignments and quizzes.
+                <div className="p-4 text-sm text-gray-500 max-h-[500px] overflow-y-auto">
+                    {!selectedModuleId ? (
+                        <p className="italic text-center text-gray-400">Select a module to view existing assignments and quizzes.</p>
+                    ) : existingLessons.length === 0 ? (
+                        <p className="italic text-center text-gray-400">No assessments found in this module.</p>
+                    ) : (
+                        <ul className="space-y-3">
+                            {existingLessons.map((item) => (
+                                <li key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                                    <div className="flex items-center gap-2">
+                                        {item.content_type === 'quiz' ? (
+                                            <HelpCircle size={18} className="text-purple-600" />
+                                        ) : (
+                                            <FileText size={18} className="text-orange-600" />
+                                        )}
+                                        <div>
+                                            <p className="font-semibold text-gray-800">{item.title}</p>
+                                            <span className="text-[10px] uppercase text-gray-500">{item.content_type}</span>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             </div>
         )}

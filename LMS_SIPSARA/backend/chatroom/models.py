@@ -175,6 +175,9 @@ class Notification(models.Model):
         ('group_message', 'Group Message'),
         ('group_member_added', 'Member Added to Group'),
         ('group_member_removed', 'Member Removed from Group'),
+        ('plagiarism_alert', 'Plagiarism Alert'),
+        ('misconduct_alert', 'Misconduct Alert'),
+        ('assignment_due', 'Assignment Due'),
     ]
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='notifications', on_delete=models.CASCADE)

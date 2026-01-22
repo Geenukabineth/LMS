@@ -1,252 +1,17 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '@/context/authService';
+// ✅ Import the new service
+import { courseService } from '@/config/course.config'; 
 import {
   BookOpen,
-  Clock,
   Users,
-  Star,
-  Play,
-  FileText,
-  MessageSquare,
-  Download,
   ChevronRight,
   Search,
-  Filter,
   Grid,
   List,
-  CheckCircle2,
   AlertCircle,
-  Calendar,
-  BarChart3,
-  Lock,
-  ArrowLeft,
   Loader,
 } from 'lucide-react';
-
-// ============================================================================
-// 🔌 API CONFIGURATION
-// ============================================================================
-
-const API_BASE_URL = 'http://localhost:8000/Course';
-
-
-
-// ============================================================================
-// API SERVICE WITH CORRECT authService METHODS
-// ============================================================================
-
-const courseApiService = {
-  /**
-   * Get authentication headers using authService.getToken()
-   */
-  getAuthHeaders() {
-    try {
-      const token = authService.getToken();
-      
-      if (!token) {
-        console.warn('⚠️ No token found in authService');
-        throw new Error('No authentication token - Please login first');
-      }
-
-      
-
-      return {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-    } catch (error) {
-      console.error('❌ Error getting auth headers:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * GET /Course/student/enrolled-courses/
-   * Get all enrolled courses for the current student
-   */
-  async getEnrolledCourses(filters = {}) {
-    try {
-      const params = new URLSearchParams();
-      if (filters.status && filters.status !== 'all') params.append('status', filters.status);
-      if (filters.search) params.append('search', filters.search);
-
-      const url = `${API_BASE_URL}/student/enrolled-courses/?${params}`;
-      
-
-      const headers = this.getAuthHeaders();
-     
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: headers,
-      });
-
-      
-
-      if (response.status === 401) {
-        console.error('❌ 401 Unauthorized - Token invalid or expired');
-        authService.logout();
-        throw new Error('Unauthorized: Session expired - Please login again');
-      }
-
-      if (response.status === 404) {
-        console.error('❌ 404 Not Found - Endpoint does not exist');
-        throw new Error('Endpoint not found - Check API configuration');
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ Response error: ${response.status} - ${errorText}`);
-        throw new Error(`Failed to fetch courses: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      return data;
-    } catch (error) {
-      console.error('❌ Exception in getEnrolledCourses:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * GET /Course/student/enrolled-courses/<course_id>/
-   */
-  async getEnrolledCourseDetail(courseId) {
-    try {
-      const url = `${API_BASE_URL}/student/enrolled-courses/${courseId}/`;
-      console.log(`📡 Fetching: ${url}`);
-
-      const headers = this.getAuthHeaders();
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch course detail: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`❌ Exception in getEnrolledCourseDetail:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * GET /Course/student/enrolled-courses/<course_id>/progress/
-   */
-  async getCourseProgress(courseId) {
-    try {
-      const url = `${API_BASE_URL}/student/enrolled-courses/${courseId}/progress/`;
-      console.log(`📡 Fetching: ${url}`);
-
-      const headers = this.getAuthHeaders();
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch progress: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`❌ Exception in getCourseProgress:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * GET /Course/student/enrolled-courses/<course_id>/lessons/
-   */
-  async getCourseLessons(courseId) {
-    try {
-      const url = `${API_BASE_URL}/student/enrolled-courses/${courseId}/lessons/`;
-      console.log(`📡 Fetching: ${url}`);
-
-      const headers = this.getAuthHeaders();
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch lessons: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`❌ Exception in getCourseLessons:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * GET /Course/student/enrolled-courses/<course_id>/modules/
-   */
-  async getCourseModules(courseId) {
-    try {
-      const url = `${API_BASE_URL}/student/enrolled-courses/${courseId}/modules/`;
-      console.log(`📡 Fetching: ${url}`);
-
-      const headers = this.getAuthHeaders();
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch modules: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`❌ Exception in getCourseModules:`, error);
-      throw error;
-    }
-  },
-};
-
-// ============================================================================
-// HELPER FUNCTION: Extract Array from Response
-// ============================================================================
-
-const extractCoursesArray = (data) => {
- 
-  
-  // If it's already an array
-  if (Array.isArray(data)) {
-    console.log('✅ Response is a direct array');
-    return data;
-  }
-
-  // If it's an object with results key (DRF paginated format)
-  if (data?.results && Array.isArray(data.results)) {
-    
-    return data.results;
-  }
-
-  // If it's an object with data key
-  if (data?.data && Array.isArray(data.data)) {
-    console.log('✅ Response has data key with array');
-    return data.data;
-  }
-
-  console.warn('⚠️ Could not extract array from response. Raw response:', data);
-  return [];
-};
-
-// ============================================================================
-// MAIN COMPONENT: StudentCourseView
-// ============================================================================
 
 const StudentCourseView = () => {
   const navigate = useNavigate();
@@ -267,25 +32,24 @@ const StudentCourseView = () => {
       setError(null);
       
       try {
-        const response = await courseApiService.getEnrolledCourses({
+        // ✅ Use the service instead of local fetch
+        // The service now handles the extraction logic (extractCoursesArray) internally
+        const coursesData = await courseService.getEnrolledCourses({
           status: statusFilter,
           search: searchQuery,
         });
-
-        const coursesArray = extractCoursesArray(response);
         
-        if (!Array.isArray(coursesArray)) {
-          throw new Error('Failed to process courses data - response is not an array');
-        }
-        
-        setEnrolledCourses(coursesArray);
+        setEnrolledCourses(coursesData);
         
       } catch (err) {
         console.error('❌ Error fetching courses:', err);
-        setError(err.message || 'Failed to load courses. Please try again later.');
+        // Clean error message handling
+        const errorMessage = err.response?.data?.detail || err.message || 'Failed to load courses.';
+        setError(errorMessage);
         
-        if (err.message.includes('Session expired')) {
-          navigate('/login');
+        // Handle 401 specifically if needed, though your api interceptor usually handles this
+        if (err.response?.status === 401) {
+             navigate('/login');
         }
       } finally {
         setIsLoading(false);
@@ -296,12 +60,9 @@ const StudentCourseView = () => {
     return () => clearTimeout(timeoutId);
   }, [statusFilter, searchQuery, navigate]);
 
-  // Filter and search
+  // Filter and search (Client-side refinement)
   useEffect(() => {
-    
-    
     if (!Array.isArray(enrolledCourses)) {
-      console.warn('⚠️ enrolledCourses is not an array');
       setFilteredCourses([]);
       return;
     }
@@ -310,10 +71,10 @@ const StudentCourseView = () => {
 
     if (searchQuery) {
       filtered = filtered.filter(course => {
+        // Handle nested course objects safely
         const courseTitle = course?.course?.title || course?.title || 'Untitled';
         return courseTitle.toLowerCase().includes(searchQuery.toLowerCase());
       });
-      console.log(`🔍 After search: ${filtered.length} courses`);
     }
 
     setFilteredCourses(filtered);
@@ -323,7 +84,7 @@ const StudentCourseView = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <Loader className="w-12 h-12 mx-auto mb-4 text-blue-600 animate-spin" />
+          <Loader className="w-12 h-12 mx-auto mb-4 text-orange-600 animate-spin" />
           <p className="text-gray-600">Loading your courses...</p>
         </div>
       </div>
@@ -340,41 +101,6 @@ const StudentCourseView = () => {
               <div>
                 <h3 className="mb-2 font-semibold text-red-900">Error Loading Courses</h3>
                 <p className="text-red-700">{error}</p>
-                <p className="mt-2 text-sm text-red-600">
-                  API endpoint: {API_BASE_URL}/student/enrolled-courses/
-                </p>
-                <details className="p-3 mt-4 bg-white border border-red-200 rounded">
-                  <summary className="font-semibold text-red-800 cursor-pointer">
-                    🔍 Debugging Info
-                  </summary>
-                  <div className="mt-3 space-y-2 text-xs text-red-700">
-                    <p>✓ Check browser console (F12) for detailed response structure</p>
-                    <p>✓ Is authenticated: {authService.isAuthenticated() ? '✅ Yes' : '❌ No'}</p>
-                    <p>✓ Has token: {authService.getToken() ? '✅ Yes' : '❌ No'}</p>
-                    <p>✓ Try logging in again if needed</p>
-                    <p>✓ Verify Django is running: python manage.py runserver</p>
-                  </div>
-                </details>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Safety check
-  if (!Array.isArray(filteredCourses)) {
-    console.error('❌ Critical: filteredCourses is not an array!', filteredCourses);
-    return (
-      <div className="min-h-screen p-6 bg-gray-50">
-        <div className="max-w-2xl mx-auto">
-          <div className="p-6 border border-red-200 rounded-lg bg-red-50">
-            <div className="flex items-start gap-4">
-              <AlertCircle className="flex-shrink-0 w-6 h-6 mt-1 text-red-600" />
-              <div>
-                <h3 className="mb-2 font-semibold text-red-900">Data Processing Error</h3>
-                <p className="text-red-700">Failed to process courses data. Please check console for details.</p>
               </div>
             </div>
           </div>
@@ -388,12 +114,12 @@ const StudentCourseView = () => {
     <div className="min-h-screen p-6 bg-gray-50">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="flex items-center gap-3 text-3xl font-bold text-gray-900">
+        <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+          <h1 className="flex items-center gap-3 text-2xl font-bold text-white uppercase">
             <BookOpen className="w-8 h-8" />
             My Courses
           </h1>
-          <p className="mt-2 text-gray-600">View and manage your enrolled courses</p>
+          
         </div>
 
         {/* Search and Filter */}
@@ -407,7 +133,7 @@ const StudentCourseView = () => {
                   placeholder="Search courses..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             </div>
@@ -415,7 +141,7 @@ const StudentCourseView = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -425,13 +151,13 @@ const StudentCourseView = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'}`}
+                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-orange-100 text-orange-600' : 'text-gray-600'}`}
               >
                 <Grid className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'}`}
+                className={`p-2 rounded ${viewMode === 'list' ? 'bg-orange-100 text-orange-600' : 'text-gray-600'}`}
               >
                 <List className="w-5 h-5" />
               </button>
@@ -449,24 +175,19 @@ const StudentCourseView = () => {
         ) : (
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
             {filteredCourses.map((enrollment) => {
-              // Handle different data structures
+              // Handle data structure variations safely
               const courseData = enrollment?.course || enrollment;
               const courseTitle = courseData?.course_title || courseData?.title || courseData?.course?.title || 'Untitled Course';     
-
               const courseImage = courseData?.course_image;
               const teacherName = courseData?.teacher_name || courseData?.teacher?.name || 'N/A';
               const hasAccess = enrollment?.has_access !== false;
               
-              // ✅ FIX 1: Extract COURSE ID, not enrollment ID
+              // Key Identifier
               const courseId = enrollment?.course_id || courseData?.id;
               
-              // Debug logging
-              
-
               return (
                 <div
                   key={courseId}
-                  // ✅ FIX 2: Use correct route path /student/courses/:courseId
                   onClick={() => navigate(`/student/courses/${courseId}`, { state: { enrollment } })}
                   className="overflow-hidden transition bg-white rounded-lg shadow cursor-pointer hover:shadow-lg"
                 >
@@ -485,24 +206,15 @@ const StudentCourseView = () => {
                       {courseTitle}
                     </h3>
 
-                    {/* Teacher Info */}
                     <div className="flex items-center gap-2 mb-3 text-sm text-gray-600">
                       <Users className="w-4 h-4" />
                       <span>{teacherName}</span>
                     </div>
 
-                    {/* Progress Bar */}
                     <div className="mb-3">
-                      <div className="flex justify-between mb-1 text-xs text-gray-600">
-                        <span>Progress</span>
-                        <span>0%</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-200 rounded-full">
-                        <div className="h-2 bg-blue-600 rounded-full" style={{ width: '0%' }}></div>
-                      </div>
+                      
                     </div>
 
-                    {/* Status & Access */}
                     <div className="flex items-center justify-between pt-3 border-t">
                       <span className={`text-xs font-semibold px-2 py-1 rounded ${
                         hasAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'

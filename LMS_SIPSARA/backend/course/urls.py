@@ -19,7 +19,7 @@ urlpatterns = [
    
     path("teacher/courses/assignments/", TeacherCourseAssignmentAPIView.as_view(), name="teacher-course-assignments"),    # Teacher create module (for their course)
     path("teacher/modules/", ModuleAPIView.as_view(), name="teacher-module-create"),    # Teacher create lesson (for their module)
-    path("teacher/modules/<int:course_id>/", ModuleAPIView.as_view(), name="teacher-module-update"),    # Teacher update module (for their course)
+    path("teacher/modules/<int:module_id>/", ModuleAPIView.as_view(), name="teacher-module-update"),    # Teacher update module (for their course)
     path("teacher/lessons/<int:course_id>/", LessonCreateAPIView.as_view(), name="teacher-lesson-create-for-module"),    # Teacher create lesson (for their course)
     path("teacher/lessons/create/", LessonCreateAPIView.as_view(), name="teacher-lesson-create"),
 
@@ -91,13 +91,14 @@ urlpatterns = [
     path('student/review/<int:pk>/', StudentReviewDetailAPIView.as_view(), name='student-review-detail'),
     path('live/create/', CreateLiveSessionAPIView.as_view(), name='create-live-session'),
     path('live/list/<int:course_id>/', LiveSessionListAPIView.as_view(), name='list-live-sessions'),
+    path('live/session/<int:pk>/', LiveSessionDetailAPIView.as_view(), name='live-session-detail'),
     path('live/join/', MarkAttendanceAPIView.as_view(), name='join-live-session'),
    path('student/enrolled-courses/<int:course_id>/feedback/', 
          StudentCourseFeedbackListCreateAPIView.as_view(), 
          name='student-course-feedback-list'),
 
     # ✅ 2. Edit & Delete Feedback (Matches updateCourseFeedback / deleteCourseFeedback)
-    path('student/feedback/<int:pk>/', 
+    path('student/feedback/<str:pk>/', 
          StudentFeedbackDetailAPIView.as_view(), 
          name='student-feedback-detail'),
     path(
@@ -121,6 +122,10 @@ urlpatterns = [
         name="complaint-detail",
     ),
      path('teacher/plagiarism-reports/', PlagiarismReportListAPIView.as_view(), name='plagiarism-reports'),
+     path('teacher/plagiarism-reports/<int:pk>/action/', PlagiarismReportActionAPIView.as_view(), name='plagiarism-report-action'),
+    path('teacher/courses/<int:course_id>/gradebook/', TeacherCourseGradebookAPIView.as_view(), name='teacher-gradebook'),
+    path('admin/complaints/all/', AdminAllComplaintListAPIView.as_view(), name='admin-all-complaints'),
+    path('admin/feedback/all/', AdminAllFeedbackListAPIView.as_view(), name='admin-all-feedback'),
 
 ]
 

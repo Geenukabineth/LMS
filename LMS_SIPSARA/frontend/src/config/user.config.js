@@ -90,22 +90,26 @@ export const userService = {
           const response = await api.get('lms/user/', { params });
           return response.data;
   },
-
-
   getteachercoursestudents: async () => {
     const { data } = await api.get(`Course/teacher/courses/`);    
    
-    if (data?.results && Array.isArray(data.results)) {
-        // Use reduce to sum up the student_count from every course object
+    if (data?.results && Array.isArray(data.results)) {        
         const totalStudents = data.results.reduce((sum, course) => {
             return sum + (course.student_count || 0);
-        }, 0);
-        
+        }, 0);        
         return totalStudents;
     }    
     return 0; 
-}
-
+  },
+  registerStudent: async (payload) => {
+      const { data } = await api.post('lms/register/', payload);
+      return data;
+    },
+    updateStudent: async (id, formData) => {
+  
+    const { data } = await api.put(`lms/student/${id}/`, formData);
+    return data;
+  },
 
 
 

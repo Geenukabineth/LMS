@@ -137,11 +137,24 @@ class UserListView(APIView):
 
 class studentviewlist(APIView):
     """
-    Get list of all students with count
+    Get list of all students or Update a specific student
     """
     permission_classes = (permissions.AllowAny,)
     
-    def get(self, request):
+    def get(self, request, id=None):
+        if id:
+            try:
+                # Try to get by User ID first, then Student ID
+                try:
+                    student_user = User.objects.get(id=id, user_type=User.STUDENT)
+                except User.DoesNotExist:
+                    student_obj = Student.objects.get(id=id)
+                    student_user = student_obj.user
+
+                serializer = UserSerializer(student_user)
+                return Response(serializer.data)
+            except (User.DoesNotExist, Student.DoesNotExist):
+                return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
         
         try:
             students = User.objects.filter(user_type=User.STUDENT)
@@ -160,7 +173,51 @@ class studentviewlist(APIView):
                 "error": str(e),
                 "count": 0,
                 "students": []
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # ✅ ADDED THIS METHOD TO FIX THE ERROR
+    def put(self, request, id):
+        try:
+            # The ID passed from the frontend is likely the Student ID (from ReceptionRegisterView list)
+            # We need to find the Student object and their linked User account
+            student = Student.objects.get(id=id)
+            user = student.user
+        except Student.DoesNotExist:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # 1. Update User model fields (Email, Phone, Status)
+        if 'email' in request.data:
+            user.email = request.data['email']
+        if 'phone' in request.data:
+            user.phone = request.data['phone']
+        
+        # Handle status update (Active/Inactive)
+        if 'status' in request.data:
+            status_val = request.data['status']
+            user.is_active = (status_val == 'Active')
+            
+        user.save()
+
+        # 2. Update Student model fields (Name)
+        if 'firstName' in request.data:
+            student.firstName = request.data['firstName']
+        if 'lastName' in request.data:
+            student.lastName = request.data['lastName']
+        
+        student.save()
+
+        return Response({
+            "success": True, 
+            "message": "Student updated successfully",
+            "student": {
+                "id": student.id,
+                "firstName": student.firstName,
+                "lastName": student.lastName,
+                "email": user.email,
+                "phone": user.phone,
+                "status": "Active" if user.is_active else "Inactive"
+            }
+        }, status=status.HTTP_200_OK)
 
 
 class LoginAPIView(APIView):
@@ -221,7 +278,7 @@ class LoginAPIView(APIView):
             return Response({"error": "An error occurred during login"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class LogoutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         try:

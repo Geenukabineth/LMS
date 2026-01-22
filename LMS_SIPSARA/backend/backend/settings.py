@@ -250,3 +250,19 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 
+CELERY_BEAT_SCHEDULE = {
+    # Run every 5 minutes to check for finished classes
+    'mark-sessions-completed-every-5-min': {
+        'task': 'course.tasks.mark_finished_sessions_completed',
+        'schedule': 300.0,  # 300 seconds = 5 minutes
+    },
+    # Run every 5 minutes to check for upcoming classes
+    'send-class-reminders-every-5-min': {
+        'task': 'course.tasks.send_class_reminders',
+        'schedule': 300.0,
+    },
+    'cleanup-expired-announcements-every-hour': {
+        'task': 'notification.tasks.cleanup_expired_announcements', 
+        'schedule': 3600.0,  # Run every 1 hour (3600 seconds)
+    },
+}

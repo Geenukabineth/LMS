@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import ScreenProtection from "@/config/ScreenProtection";
 import { courseService } from "@/config/course.config"; 
 import {
   ArrowLeft,
@@ -17,7 +18,9 @@ import {
   Reply,
   Trash2, 
   Edit2, 
-  X
+  X,
+  Award,
+  XCircle // Added for Fail icon
 } from "lucide-react";
 
 const CourseDetailView = () => {
@@ -239,12 +242,14 @@ const CourseDetailView = () => {
   };
 
   const handleDeleteFeedback = async (feedbackId) => {
-    if (!window.confirm("Delete this feedback thread?")) return;
+    if (!window.confirm("Delete this feedback thread? This action cannot be undone.")) return;
     try {
       await courseService.deleteCourseFeedback(feedbackId);
-      setFeedbackItems(prev => prev.filter(i => i.qa_id !== feedbackId && i.id !== feedbackId));
+      setFeedbackItems(prev => prev.filter(i => (i.qa_id !== feedbackId) && (i.id !== feedbackId)));
+      alert("Feedback deleted successfully.");
     } catch (err) {
-      alert("Failed to delete feedback.");
+      console.error(err);
+      alert("Failed to delete feedback. Please try again.");
     }
   };
 
@@ -255,20 +260,20 @@ const CourseDetailView = () => {
     setSubmittingFeedback(true);
     try {
       if (editingFeedback) {
-        // ✅ UPDATE EXISTING FEEDBACK (Title)
+        // Update Feedback Title
         const payload = { title: feedbackForm.message.slice(0, 80) };
         await courseService.updateCourseFeedback(editingFeedback.qa_id || editingFeedback.id, payload);
         alert("Feedback updated!");
         setEditingFeedback(null);
       } else {
-        // ✅ CREATE NEW FEEDBACK
+        // Create New Feedback
         const createRes = await courseService.createCourseFeedback(courseId, {
           title: feedbackForm.message.slice(0, 80),
         });
         const qa = createRes.data;
 
         // Add the first message to the thread
-        await courseService.replyCourseFeedback(courseId, qa.qa_id, {
+        await courseService.replyToFeedback(courseId, qa.qa_id, {
           message: feedbackForm.message.trim(),
         });
       }
@@ -313,38 +318,35 @@ const CourseDetailView = () => {
 
   return (
     <div className="flex flex-col h-screen bg-white">
+      {/* Screen Protection Component */}
+      <ScreenProtection />
+
       {/* 1. TOP NAVBAR */}
-      <div className="flex items-center justify-between h-16 px-4 bg-gray-900 shadow-lg shrink-0">
+      <div className="flex items-center justify-between h-16 px-6 shadow-lg bg-gradient-to-r from-orange-600 to-red-500 shrink-0">
+        
+        {/* Left Side: Back Button & Title */}
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate(-1)}
-            className="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-800 hover:text-white"
+            onClick={() => navigate('/student')}
+            className="p-2 text-white transition-colors rounded-full hover:bg-white/20"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="hidden w-px h-6 bg-gray-700 sm:block" />
+          
+          <div className="hidden w-px h-6 bg-white/30 sm:block" />
+          
           <h1 className="text-sm font-semibold text-white truncate max-w-[200px] sm:max-w-md md:text-lg">
             {courseTitle}
           </h1>
         </div>
 
+        {/* Right Side: Menu */}
         <div className="flex items-center gap-4">
           <div className="items-center hidden gap-3 md:flex">
-            <div className="flex flex-col items-end">
-              <span className="text-xs text-gray-400">Your Progress</span>
-              <span className="text-xs font-bold text-green-400">
-                {Math.round(progress)}% Completed
-              </span>
-            </div>
-            <div className="w-32 h-2 bg-gray-700 rounded-full">
-              <div
-                className="h-full transition-all duration-500 bg-green-500 rounded-full"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+            {/* Optional Top Actions */}
           </div>
           <button
-            className="text-gray-300 md:hidden"
+            className="text-white md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             <Menu />
@@ -356,20 +358,46 @@ const CourseDetailView = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* LEFT SIDE: Content */}
         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+          
           {/* PLAYER WINDOW */}
           <div className="relative flex items-center justify-center w-full bg-black shadow-lg aspect-video">
             {currentLesson ? (
-              <div className="flex flex-col items-center justify-center w-full h-full p-6 text-center text-white">
+              <div className="flex flex-col items-center justify-center w-full h-full text-center text-white">
+                
+                {/* 1. VIDEO PLAYER */}
                 {currentLesson.content_type === "video" && (
-                  <>
-                    <Play className="w-20 h-20 mb-6 text-blue-500 opacity-90" />
-                    <h2 className="mb-2 text-2xl font-bold">{currentLesson.title}</h2>
-                    <p className="text-gray-400">Video Player Placeholder</p>
-                  </>
+                    <div className="w-full h-full bg-black">
+                        {currentLesson.file ? (
+                        <video
+                            controls
+                            controlsList="nodownload"
+                            className="object-contain w-full h-full"
+                            src={currentLesson.file}
+                        >
+                            Your browser does not support the video tag.
+                        </video>
+                        ) : currentLesson.content_url_or_text ? (
+                        <iframe
+                            src={currentLesson.content_url_or_text}
+                            title={currentLesson.title}
+                            className="w-full h-full"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                        />
+                        ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-white">
+                            <Play className="w-20 h-20 mb-6 text-gray-500" />
+                            <p>No video source available.</p>
+                        </div>
+                        )}
+                    </div>
                 )}
+
+                {/* 2. ASSIGNMENT VIEW */}
                 {currentLesson.content_type === "assignment" && (
-                  <>
-                    <FileText className="w-16 h-16 mb-6 text-orange-500" />
+                  <div className="p-6">
+                    <FileText className="w-16 h-16 mx-auto mb-6 text-orange-500" />
                     <h2 className="mb-2 text-2xl font-bold">{currentLesson.title}</h2>
                     <button
                       onClick={handleStartAssessment}
@@ -377,11 +405,13 @@ const CourseDetailView = () => {
                     >
                       View Assignment Details
                     </button>
-                  </>
+                  </div>
                 )}
+
+                {/* 3. QUIZ VIEW */}
                 {currentLesson.content_type === "quiz" && (
-                  <>
-                    <HelpCircle className="w-16 h-16 mb-6 text-purple-500" />
+                  <div className="p-6">
+                    <HelpCircle className="w-16 h-16 mx-auto mb-6 text-purple-500" />
                     <h2 className="mb-2 text-2xl font-bold">{currentLesson.title}</h2>
                     <button
                       onClick={handleStartAssessment}
@@ -389,11 +419,13 @@ const CourseDetailView = () => {
                     >
                       Start Quiz Attempt
                     </button>
-                  </>
+                  </div>
                 )}
+
+                {/* 4. DOCUMENT VIEW */}
                 {currentLesson.content_type === "document" && (
-                  <>
-                    <File className="w-16 h-16 mb-6 text-green-500" />
+                  <div className="p-6">
+                    <File className="w-16 h-16 mx-auto mb-6 text-green-500" />
                     <h2 className="mb-2 text-2xl font-bold">{currentLesson.title}</h2>
                     {currentLesson.document || currentLesson.content_url_or_text ? (
                       <a
@@ -407,7 +439,7 @@ const CourseDetailView = () => {
                     ) : (
                       <p className="text-red-400">No document attached.</p>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             ) : (
@@ -418,7 +450,7 @@ const CourseDetailView = () => {
           {/* DETAILS TABS */}
           <div className="max-w-4xl px-4 py-8 mx-auto md:px-8">
             <div className="flex gap-1 p-1 mb-6 border border-gray-200 rounded-lg bg-gray-50 w-fit">
-              {["overview", "feedback", "reviews"].map((tab) => (
+              {["overview", "grades", "feedback", "reviews"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -451,6 +483,92 @@ const CourseDetailView = () => {
                       <p className="text-sm text-blue-600">Course Author</p>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- GRADES TAB (UPDATED) --- */}
+            {activeTab === "grades" && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex items-center gap-2 mb-4">
+                  <Award className="w-6 h-6 text-blue-600" />
+                  <h2 className="text-2xl font-bold text-gray-900">Your Grades</h2>
+                </div>
+
+                <div className="overflow-hidden border border-gray-200 rounded-xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold tracking-wider text-gray-500 uppercase">Assessment</th>
+                        <th className="px-6 py-4 text-xs font-bold tracking-wider text-gray-500 uppercase">Type</th>
+                        
+                        <th className="px-6 py-4 text-xs font-bold tracking-wider text-gray-500 uppercase">Grade / Score</th>
+                        {/* ✅ CHANGED: Replaced Max Marks with Result */}
+                        <th className="px-6 py-4 text-xs font-bold tracking-wider text-center text-gray-500 uppercase">Result</th> 
+                         </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {modules.flatMap(m => m.lessons || []).filter(l => ['quiz', 'assignment'].includes(l.content_type)).length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="p-6 text-center text-gray-500">
+                            No assessments found in this course.
+                          </td>
+                        </tr>
+                      ) : (
+                        modules.flatMap(m => m.lessons || []).filter(l => ['quiz', 'assignment'].includes(l.content_type)).map((lesson) => {
+                          
+                          // ✅ Extract Data (Assuming Backend Fix Applied)
+                          const userScore = lesson.user_score || {};
+                          const score = userScore.score;
+                          const hasPassed = userScore.passed;
+
+                          // Fallback check if user didn't update backend (avoid crash)
+                          const displayScore = score !== undefined && score !== null ? score : '-';
+
+                          return (
+                            <tr key={lesson.id} className="transition-colors hover:bg-gray-50">
+                              {/* Assessment Title */}
+                              <td className="px-6 py-4 font-medium text-gray-900">{lesson.title}</td>
+                              
+                              {/* Type */}
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                  lesson.content_type === 'quiz' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
+                                }`}>
+                                  {lesson.content_type.toUpperCase()}
+                                </span>
+                              </td>
+
+                              
+                              {/* ✅ Grade Display */}
+                              <td className="px-6 py-4 font-bold text-blue-600">
+                                {displayScore}
+                              </td>
+
+                              {/* ✅ Pass/Fail Display */}
+                              <td className="px-6 py-4 text-center">
+                                {score !== undefined && score !== null ? (
+                                  hasPassed ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold text-green-700 bg-green-100 rounded-full">
+                                      <CheckCircle2 size={14} /> Pass
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold text-red-700 bg-red-100 rounded-full">
+                                      <XCircle size={14} /> Fail
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+
+                              
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -509,15 +627,12 @@ const CourseDetailView = () => {
                     <div className="py-8 text-sm text-center text-gray-500">No feedback yet.</div>
                   ) : (
                     feedbackItems.map((item) => {
-                      // Safety Check: Item user might be object or ID
                       const itemOwnerId = item.user?.id || item.user;
                       const owner = isOwner(itemOwnerId);
 
                       return (
-                        // Ensure this div has 'relative'
                         <div key={item.qa_id || item.id} className="relative p-4 space-y-3 bg-white border rounded-xl group">
                           
-                          {/* [STEP 3] The Buttons Code Goes Here */}
                           {owner && (
                             <div className="absolute flex gap-2 top-3 right-3">
                               <button onClick={() => handleEditFeedbackClick(item)} className="p-1 text-gray-400 hover:text-blue-600">

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from "react";
 import {
   Users, Book, BookOpen, DollarSign, LogOut, Settings,
-  MessagesSquare, Home, UserRoundCog,BarChart2, CreditCard, TvMinimalPlay, FileText, ShoppingCart
+  MessagesSquare, Home, UserRoundCog,BarChart2, CreditCard, TvMinimalPlay, FileText, ShoppingCart,BarChart
 } from "lucide-react";
 import authService from "@/context/authService";
 import logo from "@/assets/master_logo.png";
@@ -36,11 +36,12 @@ const Sidebar = ({ activeTab, setActiveTab, userType }) => {
     {id: 'courses', icon: BookOpen, label: 'My Courses', roles: ['student']},
     {id: 'browse', icon: ShoppingCart, label: 'Browse Courses', roles: ['student']},
     {id: 'complaints', icon: FileText, label: 'Complaints', roles: ['student']},
+    {id: "GradingScreen", icon:BarChart, label: 'GradingScreen', roles: ['instructor']},
    
     {id: 'payment', icon: CreditCard, label: 'Payment History', roles: ['student']}, 
     { id: "programs", label: "Programs & Courses", icon: BookOpen, roles: ["admin", ] },
     { id: "payments", label: "Payments", icon: DollarSign, roles: ["admin", "receptionist"] },
-    { id: "announcements", label: "Announcements", icon: Book, roles: ["admin", "lecturer", "receptionist", "instructor"] },
+    { id: "announcements", label: "Announcements", icon: Book, roles: ["admin"] },
     { id: "chat", label: "Chat", icon: MessagesSquare, roles: ["admin", "student", "receptionist", "instructor"] },
     { id: "settings", label: "Settings", icon: Settings, roles: ["admin", "instructor","student"] },
   ]), []);
@@ -79,7 +80,7 @@ const Sidebar = ({ activeTab, setActiveTab, userType }) => {
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
                 isActive
-                  ? "bg-blue-50 text-blue-600 border-2 border-blue-600"
+                  ? "bg-orange-50 text-orange-600 border-2 border-orange-600"
                   : "text-gray-700 hover:bg-gray-50"
               }`}
             >

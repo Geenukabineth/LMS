@@ -3,7 +3,7 @@ import { Send, User, Bot, MessageCircle, X } from 'lucide-react';
 
 function Chatbot() {
   const [messages, setMessages] = useState([
-    { text: "Hello! I'm your friendly chatbot. How can I help you today?", sender: 'bot' }
+    { text: "Hello! I'm your friend. How can I help you today?", sender: 'bot' }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -76,7 +76,7 @@ function Chatbot() {
       {/* Toggle Button */}
       {!isOpen && (
         <button
-          className="p-4 text-white transition-all duration-200 ease-in-out transform bg-blue-600 rounded-full shadow-lg hover:bg-blue-700 hover:shadow-xl hover:scale-105"
+          className="p-4 text-white transition-all duration-200 ease-in-out transform bg-orange-600 rounded-full shadow-lg hover:bg-orange-700 hover:shadow-xl hover:scale-105"
           onClick={toggleChat}
         >
           <MessageCircle size={28} />
@@ -87,8 +87,8 @@ function Chatbot() {
       {isOpen && (
         <div className="flex flex-col duration-300 bg-white border border-gray-200 shadow-2xl rounded-2xl w-96 h-96 animate-in slide-in-from-bottom-4">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-2xl">
-            <h1 className="text-lg font-semibold">React Chatbot</h1>
+          <div className="flex items-center justify-between p-4 text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-t-2xl">
+            <h1 className="text-lg font-semibold uppercase">virtual assistant</h1>
             <button
               className="p-1 transition-colors duration-200 rounded-full hover:bg-white/20"
               onClick={toggleChat}
@@ -108,7 +108,7 @@ function Chatbot() {
                 <div
                   className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                     message.sender === 'user'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-orange-600 text-white'
                       : 'bg-gray-300 text-gray-700'
                   }`}
                 >
@@ -119,7 +119,7 @@ function Chatbot() {
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                     message.sender === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-md'
+                      ? 'bg-orange-600 text-white rounded-br-md'
                       : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md shadow-sm'
                   }`}
                 >
@@ -155,12 +155,12 @@ function Chatbot() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type a message..."
-                className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
               <button
                 onClick={handleSubmit}
                 disabled={input.trim() === ''}
-                className="flex-shrink-0 p-2 text-white transition-colors duration-200 bg-blue-600 rounded-full hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="flex-shrink-0 p-2 text-white transition-colors duration-200 bg-orange-600 rounded-full hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 <Send size={18} />
               </button>

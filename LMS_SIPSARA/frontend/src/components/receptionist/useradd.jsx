@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, Plus, Trash2 } from 'lucide-react';
-import axios from 'axios';
 import PropTypes from 'prop-types';
+
+// ✅ Import services
+import { courseService } from '@/config/course.config'; // Adjust path if necessary
+import { userService } from '@/config/user.config';     // Adjust path if necessary
 
 // Constants for Academic Years (Levels)
 const ACADEMIC_YEARS = [
@@ -11,17 +14,15 @@ const ACADEMIC_YEARS = [
   'Grade 13'
 ];
 
-// Helper to get the numeric grade (1 to 13) from the string 'Grade X'
 const getGradeNumber = (gradeString) => {
   if (!gradeString) return '';
   const match = gradeString.match(/\d+/);
   return match ? match[0] : '';
 };
 
-// Reusable Loader Component
 const Loader = () => (
   <div className="flex items-center justify-center space-x-2">
-    <div className="w-4 h-4 border-2 border-blue-500 border-solid rounded-full animate-spin border-t-transparent"></div>
+    <div className="w-4 h-4 border-2 border-orange-500 border-solid rounded-full animate-spin border-t-transparent"></div>
     <span>Loading...</span>
   </div>
 );
@@ -58,7 +59,7 @@ const UserAdd = ({ onAdd, onClose }) => {
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
   const [isLevelSelected, setIsLevelSelected] = useState(false);
 
-  // Fetches courses based on the selected academicYear (Level)
+  // ✅ REFACTORED: Use courseService
   const fetchCourses = async (academicYear) => {
     if (!academicYear) {
       setCourses([]);
@@ -69,28 +70,26 @@ const UserAdd = ({ onAdd, onClose }) => {
     setIsLoadingCourses(true);
     setApiError('');
 
-    const url = `http://localhost:8000/Course/list_by_level/?level=${encodeURIComponent(academicYear)}`;
-
     try {
-      const response = await axios.get(url, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Calls the new getCoursesByLevel method in course.config.js
+      const data = await courseService.getCoursesByLevel(academicYear);
 
-      console.log('Courses fetched successfully:', response.data);
+      console.log('Courses fetched successfully:', data);
       
-      // Extract the actual course list from the 'results' key
-      let fetchedCourses = Array.isArray(response.data.results) 
-          ? response.data.results 
-          : [];
+      // Handle both paginated ({ results: [...] }) and non-paginated ([...]) responses
+      let fetchedCourses = [];
+      if (Array.isArray(data)) {
+        fetchedCourses = data;
+      } else if (data && Array.isArray(data.results)) {
+        fetchedCourses = data.results;
+      }
       
       setCourses(fetchedCourses);
       setIsLevelSelected(true);
 
     } catch (error) {
       console.error('Failed to fetch courses:', error);
-      setApiError(`Failed to load courses: ${error.response?.data?.error || error.message}. Please check backend URL configuration.`);
+      setApiError(`Failed to load courses: ${error.response?.data?.error || error.message}.`);
       setCourses([]);
       setIsLevelSelected(true);
     } finally {
@@ -98,7 +97,6 @@ const UserAdd = ({ onAdd, onClose }) => {
     }
   };
 
-  // Effect to trigger course fetching whenever academicYear changes
   useEffect(() => {
     if (studentForm.academicYear) {
       fetchCourses(studentForm.academicYear);
@@ -107,23 +105,19 @@ const UserAdd = ({ onAdd, onClose }) => {
       setIsLevelSelected(false);
     }
 
-    // Reset course/teacher selections when level changes
     setStudentForm((prev) => ({
       ...prev,
       courses: [{ course: '', teacher: '' }],
     }));
   }, [studentForm.academicYear]);
 
-  // Helper function to get course details
   const getCourseDetails = (courseId) => {
     if (!courseId) return null;
     return courses.find((c) => c.course_id === courseId); 
   };
 
-  // Refactored handleInputChange for robust array state update and correct teacher ID access
   const handleInputChange = (e, index) => {
-    const { name, value, type, checked } = e.target;
-
+    const { name, value, checked } = e.target;
     setApiError('');
 
     if (name === 'registrationFees') {
@@ -132,34 +126,22 @@ const UserAdd = ({ onAdd, onClose }) => {
     }
 
     if (index !== undefined) {
-      
       const newCourses = studentForm.courses.map((courseAssignment, i) => {
         if (i === index) {
-          // Clone the specific object being modified
           const updatedAssignment = { ...courseAssignment, [name]: value };
-
-          // Specific logic for course selection
           if (name === 'course') {
             const selectedCourse = courses.find((c) => c.course_id === value);
-            
-            // Set the course ID
             updatedAssignment.course = value;
-
-            // Auto-populate the assigned teacher's ID
             updatedAssignment.teacher = selectedCourse?.teacher?.teacher_id || ''; 
           }
           return updatedAssignment;
         }
         return courseAssignment;
       });
-
       setStudentForm((prev) => ({ ...prev, courses: newCourses }));
-      
     } else {
       setStudentForm((prev) => ({ ...prev, [name]: value }));
-      
-      // Clear errors on change
-      if (name === 'academicYear' || name === 'firstName' || name === 'lastName' || name === 'email') {
+      if (['academicYear', 'firstName', 'lastName', 'email'].includes(name)) {
         setErrors((prevErrors) => ({ ...prevErrors, [name]: '' }));
       }
     }
@@ -183,17 +165,16 @@ const UserAdd = ({ onAdd, onClose }) => {
 
   const validateForm = () => {
     const newErrors = {};
-
     if (!studentForm.firstName) newErrors.firstName = 'First Name is required.';
     if (!studentForm.lastName) newErrors.lastName = 'Last Name is required.';
     if (!studentForm.email) newErrors.email = 'Email is required.';
     else if (!/\S+@\S+\.\S+/.test(studentForm.email)) newErrors.email = 'Email is invalid.';
     if (!studentForm.academicYear) newErrors.academicYear = 'Academic Year (Level) is required.';
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // ✅ REFACTORED: Use userService
   const handleAddStudent = async () => {
     if (!validateForm()) {
       setApiError('Please fill out all required fields.');
@@ -201,43 +182,31 @@ const UserAdd = ({ onAdd, onClose }) => {
     }
 
     const gradeNumber = getGradeNumber(studentForm.academicYear);
-
-    // FIX: Generate required username and password for the RegisterSerializer validation
     const generatedUsername = `${studentForm.firstName.toLowerCase()}.${studentForm.lastName.toLowerCase()}.${Math.floor(1000 + Math.random() * 9000)}`;
     const temporaryPassword = `Student@${Math.floor(100000 + Math.random() * 900000)}`;
     
-    // Payload for the general registration endpoint (/lms/register/)
     const payload = {
-      // **CRITICAL FIXES**
       username: generatedUsername, 
       password: temporaryPassword, 
-      password2: temporaryPassword, // Required by RegisterSerializer
-      
-      // User and basic student fields
+      password2: temporaryPassword, 
       firstName: studentForm.firstName,
       lastName: studentForm.lastName,
       email: studentForm.email,
       phone: studentForm.phone,
-      semester: gradeNumber, // Maps to Grade in the backend
+      semester: gradeNumber, 
       user_type: 'student',
     };
     
-    // API URL for student registration (POST to RegisterView)
-    const API_ENDPOINT = 'http://localhost:8000/lms/register/';
-
     try {
       setApiError('');
-      const response = await axios.post(API_ENDPOINT, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Calls the new registerStudent method in user.config.js
+      const data = await userService.registerStudent(payload);
 
-      console.log('Student added successfully:', response.data);
+      console.log('Student added successfully:', data);
       setSuccessMessage('Student added successfully!');
 
       if (onAdd) {
-        onAdd(response.data);
+        onAdd(data);
       }
 
       setTimeout(() => {
@@ -263,11 +232,11 @@ const UserAdd = ({ onAdd, onClose }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 flex items-center justify-between p-6 text-white shadow bg-gradient-to-r from-blue-600 to-blue-800">
+        <div className="sticky top-0 flex items-center justify-between p-6 text-white shadow bg-gradient-to-r from-orange-600 to-red-700">
           <h2 className="text-2xl font-bold">Add New Student</h2>
           <button
             onClick={onClose}
-            className="p-1 text-white transition-colors rounded hover:bg-blue-900"
+            className="p-1 text-white transition-colors rounded hover:bg-orange-900"
             title="Close"
           >
             <X className="w-6 h-6" />
@@ -288,7 +257,7 @@ const UserAdd = ({ onAdd, onClose }) => {
 
         {/* Form Content */}
         <div className="p-6 space-y-6">
-          {/* Personal Information Section */}
+          {/* Personal Information */}
           <h3 className="pb-2 text-lg font-semibold border-b">Personal Information</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -300,7 +269,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 name="firstName"
                 value={studentForm.firstName}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-orange-500 focus:border-orange-500 ${
                   errors.firstName ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="Jane"
@@ -317,7 +286,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 name="lastName"
                 value={studentForm.lastName}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-orange-500 focus:border-orange-500 ${
                   errors.lastName ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="Doe"
@@ -334,7 +303,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 name="email"
                 value={studentForm.email}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-orange-500 focus:border-orange-500 ${
                   errors.email ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="jane.doe@example.com"
@@ -349,24 +318,23 @@ const UserAdd = ({ onAdd, onClose }) => {
                 name="phone"
                 value={studentForm.phone}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                 placeholder="+1 (555) 123-4567"
               />
             </div>
           </div>
-          {/* Guardian Information Section */}
+
+          {/* Guardian Information */}
           <h3 className="pb-2 text-lg font-semibold border-b">Guardian Information</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">
-                Guardian Name
-              </label>
+              <label className="block mb-2 text-sm font-medium text-gray-700">Guardian Name</label>
               <input
                 type="text"
                 name="guardianName"
                 value={studentForm.guardianName}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                 placeholder="Guardian's Full Name"
               />
             </div>            
@@ -378,7 +346,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 name="guardianPhone"
                 value={studentForm.guardianPhone}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                 placeholder="+1 (555) 123-4567"
               />
             </div>
@@ -395,7 +363,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 name="academicYear"
                 value={studentForm.academicYear}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-orange-500 focus:border-orange-500 ${
                   errors.academicYear ? 'border-red-500' : 'border-gray-300'
                 }`}
               >
@@ -416,7 +384,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 name="enrollmentDate"
                 value={studentForm.enrollmentDate}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
               />
             </div>
           </div>
@@ -427,7 +395,7 @@ const UserAdd = ({ onAdd, onClose }) => {
             <button
               onClick={addCourseField}
               disabled={!isLevelSelected}
-              className={`text-blue-600 hover:text-blue-800 transition-colors ${
+              className={`text-orange-600 hover:text-orange-800 transition-colors ${
                 !isLevelSelected ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
@@ -444,9 +412,7 @@ const UserAdd = ({ onAdd, onClose }) => {
 
           <div className="space-y-4">
             {studentForm.courses.map((courseAssignment, index) => {
-              // Find the full course details based on the selected course_id (string)
               const selectedCourseDetails = getCourseDetails(courseAssignment.course);
-              // Access full_name from the nested teacher object
               const teacherFullName = selectedCourseDetails?.teacher?.full_name || 'N/A';
 
               return (
@@ -460,7 +426,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                       value={courseAssignment.course}
                       onChange={(e) => handleInputChange(e, index)}
                       disabled={!isLevelSelected || isLoadingCourses}
-                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                     >
                       <option value="">-- Select Course --</option>
                       {courses.map((course) => (
@@ -475,13 +441,11 @@ const UserAdd = ({ onAdd, onClose }) => {
                     <label className="block mb-1 text-xs font-medium text-gray-700">Assigned Teacher</label>
                     <input
                       type="text"
-                      // Display the determined full name
                       value={teacherFullName}
                       readOnly
                       className="w-full px-4 py-3 text-gray-600 bg-gray-200 border border-gray-300 rounded-lg cursor-default"
                       title={selectedCourseDetails ? `Teacher: ${teacherFullName}` : 'Select a course first.'}
                     />
-                    {/* Hidden field to store the teacher ID for the payload, which is set in handleInputChange */}
                     <input type="hidden" name="teacher" value={courseAssignment.teacher} />
                   </div>
 
@@ -511,7 +475,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 value={studentForm.medicalInfo}
                 onChange={handleInputChange}
                 rows={3}
-                className="w-full px-4 py-3 transition-colors border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 transition-colors border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                 placeholder="Allergies, chronic conditions, etc."
               />
             </div>
@@ -523,7 +487,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 value={studentForm.notes}
                 onChange={handleInputChange}
                 rows={3}
-                className="w-full px-4 py-3 transition-colors border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 transition-colors border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                 placeholder="Any additional information..."
               />
             </div>
@@ -535,7 +499,7 @@ const UserAdd = ({ onAdd, onClose }) => {
                 type="checkbox"
                 checked={studentForm.registrationFees}
                 onChange={handleInputChange}
-                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
               />
               <label htmlFor="registrationFees" className="ml-3 text-sm font-medium text-gray-700">
                 Registration Fees Paid
@@ -549,7 +513,7 @@ const UserAdd = ({ onAdd, onClose }) => {
           <button
             onClick={handleAddStudent}
             disabled={isLoadingCourses}
-            className={`flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 flex items-center justify-center transition duration-150 ease-in-out ${
+            className={`flex-1 bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 flex items-center justify-center transition duration-150 ease-in-out ${
               isLoadingCourses ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >

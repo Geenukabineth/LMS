@@ -4,7 +4,6 @@ import {
   BookOpen,
   FileText,
   Award,
-  BarChart2,
   Video,
 } from "lucide-react";
 import {
@@ -18,7 +17,6 @@ import {
   Legend
 } from "recharts";
 
-import Chatbot from "@/components/aibot";
 import Topbar from "@/components/topbar";
 import StudentData from "@/components/data/studenData";
 import ModuleCreator from "../courseData/module";
@@ -30,10 +28,11 @@ import authService from "@/context/authService";
 import PlagiarismReports from "@/components/courseData/PlagiarismReports";
 import AnnouncementPanel from '@/components/AnnouncementPanel';
 import LiveClassroom from "@/components/courseData/liveclassroom";
+import GradingScreen from "@/components/admin/GradingScreen";
 import TeacherPaymentPage from "@/components/data/Teacherpaymentpage ";
 import { courseService } from "@/config/course.config";
 import { userService } from "../../config/user.config";
-
+import Chatbot from "@/components/aibot";
 
 export default function TeachersDashboard() {
   const [activeTab, setActiveTab] = useState("teacherdashboard");
@@ -46,7 +45,10 @@ export default function TeachersDashboard() {
   const [totalStudents, setTotalStudents] = useState(0);
   const [lessonsCount, setLessonsCount] = useState(0);
   const [questionsCount, setQuestionsCount] = useState(0);
-  const [chartData, setChartData] = useState([]);
+  
+  // Chart Data State
+  const [chartData, setChartData] = useState([]);       // For Enrollment (Existing)
+  const [gradeData, setGradeData] = useState([]);       // For Grades (New)
   const [upcomingClasses, setUpcomingClasses] = useState([]);
 
   const userType = (localStorage.getItem("userType") || "").toLowerCase();
@@ -84,7 +86,6 @@ export default function TeachersDashboard() {
         setTotalStudents(studentsData);
 
         // Fetch the new Detailed Stats (Lessons, Questions, Chart, Upcoming)
-        // ✅ FIX: Use courseService and handle direct data response
         const data = await courseService.getdashborddata();
         
         if (data) {
@@ -92,6 +93,9 @@ export default function TeachersDashboard() {
             setQuestionsCount(data.total_quizzes || 0);
             setChartData(data.chart_data || []);
             setUpcomingClasses(data.upcoming_classes || []);
+            
+            // ✅ Set the new performance data for the second chart
+            setGradeData(data.performance_data || []); 
         }
 
       } catch (err) {
@@ -161,7 +165,7 @@ export default function TeachersDashboard() {
           {activeTab === "teacherdashboard" && (
             <div className="p-8 space-y-8">
               {/* Welcome Banner */}
-              <div className="p-6 text-white rounded-lg bg-gradient-to-r from-blue-600 to-purple-600">
+              <div className="p-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-600">
                 <h2 className="mb-2 text-2xl font-bold">
                   Welcome back {user ? `, ${user.username || user.name || "User"}` : ""}!
                 </h2>
@@ -194,12 +198,13 @@ export default function TeachersDashboard() {
                 })}
               </div>
 
+              {/* Charts & Schedule Grid */}
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
                 {/* 1. Bar Chart: Attendance / Students per Class */}
                 <div className="p-6 bg-white rounded-lg shadow lg:col-span-2">
                   <div className="mb-6">
                     <h3 className="text-lg font-bold text-gray-800">
-                      Class Enrollment & Attendance
+                      Class Enrollment
                     </h3>
                     <p className="text-sm text-gray-500">Overview of students enrolled per course</p>
                   </div>
@@ -240,7 +245,7 @@ export default function TeachersDashboard() {
                   </div>
                 </div>
 
-                {/* 2. Upcoming Online Classes */}
+                {/* 2. Upcoming Online Classes (FIXED) */}
                 <div className="p-6 bg-white rounded-lg shadow">
                   <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-200">
                     <h3 className="text-lg font-bold text-gray-800">
@@ -255,9 +260,9 @@ export default function TeachersDashboard() {
                     {upcomingClasses.length === 0 ? (
                         <p className="py-4 text-center text-gray-500">No upcoming classes scheduled.</p>
                     ) : (
-                        upcomingClasses.map((item, index) => (
+                        upcomingClasses.map((item) => (
                         <div
-                            key={index}
+                            key={item.id} // ✅ Fixed Key
                             className="flex items-center justify-between p-4 transition-colors border border-gray-100 rounded-lg bg-gray-50 hover:bg-blue-50"
                         >
                             <div className="flex items-start space-x-3">
@@ -292,17 +297,75 @@ export default function TeachersDashboard() {
                     )}
                   </div>
                   
-                  <button className="w-full py-2 mt-6 text-sm font-medium text-blue-600 transition-colors border border-blue-200 rounded-lg hover:bg-blue-50">
+                  {/* ✅ Fixed: Button now switches tab */}
+                  <button 
+                    onClick={() => setActiveTab("liveclassroom")}
+                    className="w-full py-2 mt-6 text-sm font-medium text-blue-600 transition-colors border border-blue-200 rounded-lg hover:bg-blue-50"
+                  >
                     View Full Schedule
                   </button>
                 </div>
               </div>
+
+              {/* Grade Overview Chart */}
+              <div className="p-6 bg-white rounded-lg shadow">
+                  <div className="mb-6">
+                    <h3 className="text-lg font-bold text-gray-800">
+                      Student Performance Overview
+                    </h3>
+                    <p className="text-sm text-gray-500">Average grades for Assignments vs Quizzes per course</p>
+                  </div>
+                  
+                  <div className="w-full h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={gradeData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis 
+                          dataKey="name" 
+                          tick={{fill: '#6b7280', fontSize: 12}}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis 
+                          tick={{fill: '#6b7280', fontSize: 12}}
+                          axisLine={false}
+                          tickLine={false}
+                          domain={[0, 100]} 
+                        />
+                        <Tooltip 
+                          cursor={{fill: '#f3f4f6'}}
+                          contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
+                        />
+                        <Legend />
+                        <Bar 
+                          dataKey="Assignments" 
+                          name="Avg Assignment Score" 
+                          fill="#10B981" 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={30}
+                        />
+                        <Bar 
+                          dataKey="Quizzes" 
+                          name="Avg Quiz Score" 
+                          fill="#F59E0B" 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={30}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+              </div>
+
             </div>
           )}
 
           {/* Other Tabs */}
           {activeTab === "students" && <StudentData />}
           {activeTab === "classes" && <ModuleCreator />}
+          {activeTab === "GradingScreen" && <GradingScreen/>}
           {activeTab === "PlagiarismReports" && <PlagiarismReports />}
           {activeTab === "feedback" && <TeacherFeedbackPanel />}
           {activeTab === 'announcements' && <AnnouncementPanel />}

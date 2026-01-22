@@ -109,8 +109,8 @@ const AddTeacher = ({ onTeacherAdded, closeModal, editingTeacher }) => {
           </button>
         </div>
 
-        {successMessage && <div className="p-3 mb-4 border border-green-200 rounded-lg bg-green-50 text-green-600">{successMessage}</div>}
-        {apiError && <div className="p-3 mb-4 border border-red-200 rounded-lg bg-red-50 text-red-600 font-medium">{apiError}</div>}
+        {successMessage && <div className="p-3 mb-4 text-green-600 border border-green-200 rounded-lg bg-green-50">{successMessage}</div>}
+        {apiError && <div className="p-3 mb-4 font-medium text-red-600 border border-red-200 rounded-lg bg-red-50">{apiError}</div>}
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div>
@@ -151,7 +151,7 @@ const AddTeacher = ({ onTeacherAdded, closeModal, editingTeacher }) => {
         </div>
 
         <div className="flex mt-8 space-x-3">
-          <button onClick={handleAddTeacher} disabled={isLoading} className="flex-1 px-4 py-3 text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center justify-center disabled:bg-gray-400">
+          <button onClick={handleAddTeacher} disabled={isLoading} className="flex items-center justify-center flex-1 px-4 py-3 text-white bg-orange-500 rounded-xl hover:bg-red-600 disabled:bg-gray-400">
             <Check className="w-4 h-4 mr-2" />
             {isLoading ? 'Processing...' : (editingTeacher ? 'Update Teacher' : 'Add Teacher')}
           </button>
@@ -203,16 +203,16 @@ const UserManagementPanel = () => {
   );
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <h2 className="text-2xl font-bold text-gray-800">Teacher Management</h2>
-          <div className="flex items-center gap-3 w-full md:w-auto">
+    <div className="min-h-screen p-8 bg-gray-50">
+      <div className="mx-auto overflow-hidden bg-white shadow-xl max-w-7xl rounded-2xl">
+        <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+          <h2 className="text-2xl font-bold text-white uppercase">Teacher Management</h2>
+          <div className="flex items-center w-full gap-3 md:w-auto">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search teachers..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
+              <Search className="absolute w-4 h-4 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
+              <input type="text" placeholder="Search teachers..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full py-2 pl-10 pr-4 text-black border outline-none rounded-xl focus:ring-2 focus:ring-red-500" />
             </div>
-            <button onClick={() => { setEditingUser(null); setShowAddModal(true); }} className="bg-blue-600 text-white px-5 py-2 rounded-xl flex items-center gap-2 hover:bg-blue-700 transition-all">
+            <button onClick={() => { setEditingUser(null); setShowAddModal(true); }} className="flex items-center gap-2 px-5 py-2 text-white transition-all bg-orange-500 rounded-xl hover:bg-red-600">
               <Plus className="w-4 h-4" /> Add Teacher
             </button>
           </div>
@@ -220,7 +220,7 @@ const UserManagementPanel = () => {
 
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 text-gray-600 text-sm uppercase">
+            <thead className="text-sm text-gray-600 uppercase bg-gray-50">
               <tr>
                 <th className="px-6 py-4 text-left">Full Name</th>
                 <th className="px-6 py-4 text-left">Contact Info</th>
@@ -233,7 +233,7 @@ const UserManagementPanel = () => {
               {loading ? (
                  <tr><td colSpan="5" className="px-6 py-12 text-center text-gray-400">Loading teachers...</td></tr>
               ) : filteredUsers.length > 0 ? filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={user.id} className="transition-colors hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{user.First_Name} {user.Last_Name}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     <div className="flex flex-col">
@@ -249,8 +249,8 @@ const UserManagementPanel = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => { setEditingUser(user); setShowAddModal(true); }} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit3 className="w-4 h-4" /></button>
-                      <button onClick={() => { setUserToDelete(user.id); setShowDeleteModal(true); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash className="w-4 h-4" /></button>
+                      <button onClick={() => { setEditingUser(user); setShowAddModal(true); }} className="p-2 text-orange-500 rounded-lg hover:text-orange-600 hover:bg-blue-50"><Edit3 className="w-4 h-4" /></button>
+                      <button onClick={() => { setUserToDelete(user.id); setShowDeleteModal(true); }} className="p-2 text-red-500 rounded-lg hover:text-red-600 hover:bg-red-50"><Trash className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -268,12 +268,12 @@ const UserManagementPanel = () => {
 
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl max-w-sm w-full shadow-2xl">
-            <h3 className="text-xl font-bold mb-2">Delete Teacher?</h3>
-            <p className="text-gray-500 mb-6">This action cannot be undone. Are you sure you want to remove this user from the system?</p>
+          <div className="w-full max-w-sm p-6 bg-white shadow-2xl rounded-2xl">
+            <h3 className="mb-2 text-xl font-bold">Delete Teacher?</h3>
+            <p className="mb-6 text-gray-500">This action cannot be undone. Are you sure you want to remove this user from the system?</p>
             <div className="flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 font-medium">Cancel</button>
-              <button onClick={() => handleDelete(userToDelete)} className="flex-1 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 font-medium">Delete</button>
+              <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2 font-medium bg-gray-100 rounded-xl hover:bg-gray-200">Cancel</button>
+              <button onClick={() => handleDelete(userToDelete)} className="flex-1 py-2 font-medium text-white bg-red-600 rounded-xl hover:bg-red-700">Delete</button>
             </div>
           </div>
         </div>

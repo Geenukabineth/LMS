@@ -221,7 +221,7 @@ const AnnouncementPanel = ({
   // -------------------- UI helpers --------------------
   const getTypeColor = (type) => {
     const colors = {
-      general: "bg-blue-50 border-l-4 border-blue-500",
+      general: "bg-orange-50 border-l-4 border-orange-500",
       course: "bg-green-50 border-l-4 border-green-500",
       assignment: "bg-yellow-50 border-l-4 border-yellow-500",
       urgent: "bg-red-50 border-l-4 border-red-500",
@@ -231,7 +231,7 @@ const AnnouncementPanel = ({
 
   const getTypeBadge = (type) => {
     const badges = {
-      general: { label: "General", color: "bg-blue-100 text-blue-800" },
+      general: { label: "General", color: "bg-orange-100 text-orange-800" },
       course: { label: "Course", color: "bg-green-100 text-green-800" },
       assignment: { label: "Assignment", color: "bg-yellow-100 text-yellow-800" },
       urgent: { label: "Urgent", color: "bg-red-100 text-red-800" },
@@ -270,8 +270,14 @@ const AnnouncementPanel = ({
   // 🔴 REMOVED: canManage function
 
   return (
-    <div className="w-full p-6 bg-white rounded-lg">
-      <h1 className="mb-6 text-3xl font-bold text-gray-900">Announcements</h1>
+    
+    <div className="w-full p-6 bg-white rounded-lg ">
+      <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+          <div className="px-2 py-2">
+            <h1 className="mb-2 text-3xl font-bold text-white uppercase">Announcements</h1>
+          </div>
+        </div>
+      
 
       {errorMessage && (
         <div className="flex items-center gap-2 p-4 mb-6 text-red-700 bg-red-100 border border-red-400 rounded-lg">
@@ -290,7 +296,7 @@ const AnnouncementPanel = ({
       <button
         onClick={() => setShowForm(!showForm)}
         disabled={isLoading}
-        className="px-4 py-2 mb-6 font-semibold text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        className="px-4 py-2 mb-6 font-semibold text-white transition bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50"
       >
         {showForm ? "Cancel" : "+ New Announcement"}
       </button>
@@ -311,7 +317,7 @@ const AnnouncementPanel = ({
                 name="title"
                 value={formData.title}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 required
               />
             </div>
@@ -325,7 +331,7 @@ const AnnouncementPanel = ({
                 value={formData.content}
                 onChange={handleInputChange}
                 rows="5"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-500"
                 required
               />
             </div>
@@ -339,7 +345,7 @@ const AnnouncementPanel = ({
                   name="type"
                   value={formData.type}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="general">General</option>
                   <option value="course">Course</option>
@@ -356,7 +362,7 @@ const AnnouncementPanel = ({
                   name="visibility"
                   value={formData.visibility}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="everyone">Everyone</option>
                   <option value="students">Students Only</option>
@@ -373,7 +379,7 @@ const AnnouncementPanel = ({
                   name="expires_at"
                   value={formData.expires_at}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             </div>
@@ -406,7 +412,7 @@ const AnnouncementPanel = ({
             onClick={() => setFilterType(type)}
             className={`px-4 py-2 rounded-lg font-semibold transition ${
               filterType === type
-                ? "bg-blue-600 text-white"
+                ? "bg-orange-600 text-white"
                 : "bg-gray-200 text-gray-800 hover:bg-gray-300"
             }`}
           >
@@ -421,7 +427,7 @@ const AnnouncementPanel = ({
           placeholder="Search announcements..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
         />
       </div>
 
@@ -469,7 +475,7 @@ const AnnouncementPanel = ({
                   <button
                     type="button"
                     onClick={() => handleEdit(announcement)}
-                    className="p-2 text-gray-600 transition hover:text-blue-600"
+                    className="p-2 text-gray-600 transition hover:text-orange-600"
                     title="Edit"
                   >
                     <Edit2 size={18} />

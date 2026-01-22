@@ -1,18 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import authService from '@/context/authService';
 import { 
-  Download, Printer, Eye, Search, X, Filter, TrendingUp, Calendar,
+  Download, Eye, Search, X, Calendar,
   AlertCircle, Loader, CheckCircle, XCircle, Clock, DollarSign
 } from 'lucide-react';
 
-/**
- * ✅ FIXED: Payment Page Component
- * 
- * Shows student names correctly by:
- * 1. API returns student_name field
- * 2. Component displays student_name in table
- * 3. Handles "Unknown Student" gracefully
- */
+// ✅ FIXED: Import paymentService (replaces authService)
+import { paymentService } from '@/config/payment.config';
 
 const PaymentPage = () => {
   const [loading, setLoading] = useState(true);
@@ -21,6 +14,9 @@ const PaymentPage = () => {
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  
+  // ✅ NEW: State for tracking download progress
+  const [downloading, setDownloading] = useState(false);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,7 +24,7 @@ const PaymentPage = () => {
   const [filterMethod, setFilterMethod] = useState('all');
   const [sortBy, setSortBy] = useState('date-desc');
 
-  // Financial summary
+  // Financial summary state
   const [financialSummary, setFinancialSummary] = useState({
     totalTransactions: 0,
     totalAmount: 0,
@@ -38,8 +34,6 @@ const PaymentPage = () => {
     averageTransaction: 0
   });
 
-  const token = authService.getToken();
-
   useEffect(() => {
     fetchPaymentRecords();
   }, []);
@@ -48,25 +42,18 @@ const PaymentPage = () => {
     applyFilters();
   }, [paymentRecords, searchTerm, filterStatus, filterMethod, sortBy]);
 
-  // ✅ Fetch payment records from API
+  // ✅ FIXED: Fetch records using paymentService
   const fetchPaymentRecords = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:8000/payment/transactions/', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      // Uses the configured API service to fetch all transactions
+      // NOTE: Ensure your backend user has 'is_staff' permission to see all records,
+      // otherwise this endpoint might filter to only the logged-in user.
+      const data = await paymentService.getStudentTransactions();
+      
+      // Handle pagination (data.results) or direct array (data)
       const records = Array.isArray(data) ? data : data.results || [];
       
       setPaymentRecords(records);
@@ -74,13 +61,46 @@ const PaymentPage = () => {
       
     } catch (err) {
       console.error('Error fetching payments:', err);
-      setError(err.message);
+      setError(err.message || "Failed to fetch payment records.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Calculate financial summary
+  // ✅ NEW: Handle Receipt Download
+  const handleDownloadReceipt = async (transactionId) => {
+    try {
+      setDownloading(true);
+      
+      // 1. Fetch the PDF blob from the service
+      const blob = await paymentService.downloadReceipt(transactionId);
+      
+      // 2. Create a temporary download URL
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // 3. Set a filename (using reference number if available, else ID)
+      const ref = selectedRecord?.reference_number || transactionId.substring(0, 8);
+      link.setAttribute('download', `Receipt-${ref}.pdf`);
+      
+      // 4. Trigger the download
+      document.body.appendChild(link);
+      link.click();
+      
+      // 5. Cleanup
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+      console.error("Download error:", err);
+      alert("Failed to download receipt. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Calculate stats for the dashboard cards
   const calculateFinancialSummary = (records) => {
     if (!records.length) {
       setFinancialSummary({
@@ -110,29 +130,28 @@ const PaymentPage = () => {
     });
   };
 
-  // Apply all filters
+  // Filter logic
   const applyFilters = () => {
     let filtered = [...paymentRecords];
 
-    // Filter by status
+    // 1. Status Filter
     if (filterStatus !== 'all') {
       filtered = filtered.filter(r => r.status === filterStatus);
     }
 
-    // Filter by method
+    // 2. Method Filter
     if (filterMethod !== 'all') {
       filtered = filtered.filter(r => r.payment_method_used === filterMethod);
     }
 
-    // Search - ✅ FIXED: Search by student_name
+    // 3. Search Filter
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(r => {
-        // ✅ Search student_name (now populated correctly)
         const studentName = (r.student_name || '').toLowerCase();
         const studentEmail = (r.student_email || '').toLowerCase();
         const reference = (r.reference_number || '').toLowerCase();
-        const amount = r.amount.toString();
+        const amount = (r.amount || '').toString();
         
         return (
           studentName.includes(searchLower) ||
@@ -143,7 +162,7 @@ const PaymentPage = () => {
       });
     }
 
-    // Sort
+    // 4. Sorting
     if (sortBy === 'date-desc') {
       filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     } else if (sortBy === 'date-asc') {
@@ -157,41 +176,19 @@ const PaymentPage = () => {
     setFilteredRecords(filtered);
   };
 
-  // Get status style
   const getStatusBadge = (status) => {
     switch (status) {
       case 'successful':
-        return {
-          icon: CheckCircle,
-          bg: 'bg-green-100',
-          text: 'text-green-800',
-          label: 'Successful'
-        };
+        return { icon: CheckCircle, bg: 'bg-green-100', text: 'text-green-800', label: 'Successful' };
       case 'pending':
-        return {
-          icon: Clock,
-          bg: 'bg-yellow-100',
-          text: 'text-yellow-800',
-          label: 'Pending'
-        };
+        return { icon: Clock, bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' };
       case 'failed':
-        return {
-          icon: XCircle,
-          bg: 'bg-red-100',
-          text: 'text-red-800',
-          label: 'Failed'
-        };
+        return { icon: XCircle, bg: 'bg-red-100', text: 'text-red-800', label: 'Failed' };
       default:
-        return {
-          icon: DollarSign,
-          bg: 'bg-gray-100',
-          text: 'text-gray-800',
-          label: 'Unknown'
-        };
+        return { icon: DollarSign, bg: 'bg-gray-100', text: 'text-gray-800', label: 'Unknown' };
     }
   };
 
-  // Format date
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -200,16 +197,10 @@ const PaymentPage = () => {
     });
   };
 
-  // Get payment method label
   const getPaymentMethodLabel = (method) => {
     const methods = {
-      'card': '💳 Card',
-      'cash': '💵 Cash',
-      'bank': '🏦 Bank',
-      'check': '📝 Check',
-      'physical': '💳 Physical',
-      'stripe': '💳 Stripe',
-      'other': '📋 Other'
+      'card': '💳 Card', 'cash': '💵 Cash', 'bank': '🏦 Bank',
+      'check': '📝 Check', 'physical': '💳 Physical', 'stripe': '💳 Stripe', 'other': '📋 Other'
     };
     return methods[method] || method || 'N/A';
   };
@@ -218,7 +209,7 @@ const PaymentPage = () => {
     return (
       <div className="flex items-center justify-center p-12">
         <div className="text-center">
-          <Loader className="mx-auto mb-4 text-blue-600 animate-spin" size={32} />
+          <Loader className="mx-auto mb-4 text-orange-600 animate-spin" size={32} />
           <p className="text-gray-600">Loading payment records...</p>
         </div>
       </div>
@@ -227,7 +218,7 @@ const PaymentPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Error Message */}
+      {/* Error Banner */}
       {error && (
         <div className="p-4 border border-red-200 rounded-lg bg-red-50">
           <div className="flex items-start gap-3">
@@ -240,12 +231,12 @@ const PaymentPage = () => {
         </div>
       )}
 
-      {/* Financial Summary Cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-          <p className="text-xs font-semibold text-blue-600 uppercase">Total Transactions</p>
-          <p className="mt-1 text-2xl font-bold text-blue-900">{financialSummary.totalTransactions}</p>
-          <p className="mt-2 text-xs text-blue-600">All records</p>
+        <div className="p-4 border border-orange-200 rounded-lg bg-orange-50">
+          <p className="text-xs font-semibold text-orange-600 uppercase">Total Transactions</p>
+          <p className="mt-1 text-2xl font-bold text-orange-900">{financialSummary.totalTransactions}</p>
+          <p className="mt-2 text-xs text-orange-600">All records</p>
         </div>
 
         <div className="p-4 border border-green-200 rounded-lg bg-green-50">
@@ -273,26 +264,24 @@ const PaymentPage = () => {
         </div>
       </div>
 
-      {/* Filters and Search */}
+      {/* Filters */}
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-          {/* Search - ✅ FIXED: Now searches student names */}
           <div className="relative lg:col-span-2">
             <Search className="absolute text-gray-400 left-3 top-3" size={18} />
             <input
               type="text"
               placeholder="Search by student, email, reference..."
-              className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          {/* Status Filter */}
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
           >
             <option value="all">All Status</option>
             <option value="successful">✅ Successful</option>
@@ -300,11 +289,10 @@ const PaymentPage = () => {
             <option value="failed">❌ Failed</option>
           </select>
 
-          {/* Method Filter */}
           <select
             value={filterMethod}
             onChange={(e) => setFilterMethod(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
           >
             <option value="all">All Methods</option>
             <option value="card">💳 Card</option>
@@ -313,11 +301,10 @@ const PaymentPage = () => {
             <option value="check">📝 Check</option>
           </select>
 
-          {/* Sort */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
           >
             <option value="date-desc">Newest First</option>
             <option value="date-asc">Oldest First</option>
@@ -326,7 +313,6 @@ const PaymentPage = () => {
           </select>
         </div>
 
-        {/* Results Count */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-600">
             Showing {filteredRecords.length} of {paymentRecords.length} transactions
@@ -343,7 +329,7 @@ const PaymentPage = () => {
         </div>
       </div>
 
-      {/* Payment Records Table - ✅ FIXED: Shows student_name correctly */}
+      {/* Table */}
       {filteredRecords.length === 0 ? (
         <div className="p-12 text-center border border-gray-200 rounded-lg bg-gray-50">
           <DollarSign className="mx-auto mb-3 text-gray-400" size={32} />
@@ -372,47 +358,30 @@ const PaymentPage = () => {
 
                 return (
                   <tr key={record.id} className="hover:bg-gray-50">
-                    {/* Date */}
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="flex items-center gap-2">
                         <Calendar size={16} className="text-gray-400" />
                         {formatDate(record.created_at)}
                       </div>
                     </td>
-
-                    {/* ✅ FIXED: Student Name Column */}
                     <td className="px-6 py-4 text-sm">
                       <div>
-                        {/* ✅ Shows student_name (now properly populated) */}
-                        <p className="font-medium text-gray-900">
-                          {record.student_name || 'Unknown Student'}
-                        </p>
-                        {/* Shows email if available */}
-                        <p className="text-xs text-gray-500">
-                          {record.student_email || 'N/A'}
-                        </p>
+                        <p className="font-medium text-gray-900">{record.student_name || 'Unknown Student'}</p>
+                        <p className="text-xs text-gray-500">{record.student_email || 'N/A'}</p>
                       </div>
                     </td>
-
-                    {/* Amount */}
                     <td className="px-6 py-4 text-sm font-semibold text-gray-900">
                       ${parseFloat(record.amount).toFixed(2)}
                     </td>
-
-                    {/* Method */}
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {getPaymentMethodLabel(record.payment_method_used)}
                     </td>
-
-                    {/* Status */}
                     <td className="px-6 py-4">
                       <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}>
                         <StatusIcon size={14} />
                         {statusStyle.label}
                       </div>
                     </td>
-
-                    {/* Reference */}
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {record.reference_number ? (
                         <code className="px-2 py-1 text-xs bg-gray-100 rounded">
@@ -422,15 +391,13 @@ const PaymentPage = () => {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-
-                    {/* Actions */}
                     <td className="px-6 py-4 text-center">
                       <button
                         onClick={() => {
                           setSelectedRecord(record);
                           setShowModal(true);
                         }}
-                        className="inline-flex items-center gap-1 px-3 py-2 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
+                        className="inline-flex items-center gap-1 px-3 py-2 text-xs text-white bg-orange-600 rounded hover:bg-orange-700"
                       >
                         <Eye size={14} />
                         View
@@ -444,7 +411,7 @@ const PaymentPage = () => {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Details Modal */}
       {showModal && selectedRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black bg-opacity-50">
           <div className="w-full max-w-2xl my-8 bg-white rounded-lg shadow-xl">
@@ -461,40 +428,30 @@ const PaymentPage = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* ✅ FIXED: Shows student information correctly */}
               <div>
                 <h4 className="mb-4 text-lg font-semibold text-gray-900">Student Information</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs font-semibold text-gray-600 uppercase">Student Name</p>
-                    <p className="mt-1 font-medium text-gray-900">
-                      {selectedRecord.student_name || 'Unknown Student'}
-                    </p>
+                    <p className="mt-1 font-medium text-gray-900">{selectedRecord.student_name || 'Unknown Student'}</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-600 uppercase">Email</p>
-                    <p className="mt-1 text-gray-900">
-                      {selectedRecord.student_email || 'N/A'}
-                    </p>
+                    <p className="mt-1 text-gray-900">{selectedRecord.student_email || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-600 uppercase">Phone</p>
-                    <p className="mt-1 text-gray-900">
-                      {selectedRecord.student_phone || 'N/A'}
-                    </p>
+                    <p className="mt-1 text-gray-900">{selectedRecord.student_phone || 'N/A'}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Transaction Info */}
               <div>
                 <h4 className="mb-4 text-lg font-semibold text-gray-900">Transaction Information</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs font-semibold text-gray-600 uppercase">Amount</p>
-                    <p className="mt-1 text-2xl font-bold text-gray-900">
-                      ${parseFloat(selectedRecord.amount).toFixed(2)}
-                    </p>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">${parseFloat(selectedRecord.amount).toFixed(2)}</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-600 uppercase">Status</p>
@@ -513,21 +470,39 @@ const PaymentPage = () => {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-600 uppercase">Method</p>
-                    <p className="mt-1 text-gray-900">
-                      {getPaymentMethodLabel(selectedRecord.payment_method_used)}
-                    </p>
+                    <p className="mt-1 text-gray-900">{getPaymentMethodLabel(selectedRecord.payment_method_used)}</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-600 uppercase">Reference</p>
-                    <p className="mt-1 font-mono text-sm text-gray-900">
-                      {selectedRecord.reference_number || 'N/A'}
-                    </p>
+                    <p className="mt-1 font-mono text-sm text-gray-900">{selectedRecord.reference_number || 'N/A'}</p>
                   </div>
+                  
+                  {selectedRecord.notes && (
+                    <div className="col-span-2">
+                      <p className="text-xs font-semibold text-gray-600 uppercase">Notes</p>
+                      <p className="p-2 mt-1 text-sm text-gray-700 rounded bg-gray-50">{selectedRecord.notes}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end p-6 border-t border-gray-200 bg-gray-50">
+            {/* Modal Footer with Download Button */}
+            <div className="flex justify-between p-6 border-t border-gray-200 bg-gray-50">
+              {/* ✅ NEW: Download Receipt Button */}
+              <button
+                onClick={() => handleDownloadReceipt(selectedRecord.id)}
+                disabled={downloading}
+                className="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300"
+              >
+                {downloading ? (
+                  <Loader size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+                {downloading ? 'Downloading...' : 'Download Receipt'}
+              </button>
+
               <button
                 onClick={() => setShowModal(false)}
                 className="px-6 py-2 font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"

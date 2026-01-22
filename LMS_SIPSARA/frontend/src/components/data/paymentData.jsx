@@ -20,7 +20,8 @@ import { paymentService } from "@/config/payment.config";
 const AdminPaymentPanel = () => {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTimeRange, setSelectedTimeRange] = useState("7d");
+  // ✅ Changed default to "all"
+  const [selectedTimeRange, setSelectedTimeRange] = useState("all");
 
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,7 +33,7 @@ const AdminPaymentPanel = () => {
     const rows = Array.isArray(data) ? data : data?.results || [];
     return rows.map((item) => ({
       id: item.id,
-      orderId: item.description || `Order #${item.id.slice(0, 8)}`, // Fallback if description is empty
+      orderId: item.description || `Order #${item.id.slice(0, 8)}`,
       user: item.user,
       email: item.email,
       amount: Number(item.amount || 0),
@@ -63,10 +64,15 @@ const AdminPaymentPanel = () => {
 
   // Filter Logic
   const filteredPayments = useMemo(() => {
-    const now = new Date();
-    const days = selectedTimeRange === "7d" ? 7 : selectedTimeRange === "30d" ? 30 : 90;
-    const start = new Date(now);
-    start.setDate(now.getDate() - days);
+    let start = null;
+
+    // ✅ Logic to handle "all" vs specific ranges
+    if (selectedTimeRange !== "all") {
+        const now = new Date();
+        const days = selectedTimeRange === "7d" ? 7 : selectedTimeRange === "30d" ? 30 : 90;
+        start = new Date(now);
+        start.setDate(now.getDate() - days);
+    }
 
     return payments.filter((payment) => {
       const matchesFilter = selectedFilter === "all" || payment.status === selectedFilter;
@@ -79,7 +85,9 @@ const AdminPaymentPanel = () => {
         (payment.email || "").toLowerCase().includes(term);
 
       const paymentDate = payment.date ? new Date(`${payment.date}T00:00:00`) : null;
-      const matchesRange = paymentDate ? paymentDate >= start : true;
+      
+      // ✅ Allow all if range is "all", otherwise check date
+      const matchesRange = selectedTimeRange === "all" || (paymentDate && paymentDate >= start);
 
       return matchesFilter && matchesSearch && matchesRange;
     });
@@ -170,10 +178,9 @@ const AdminPaymentPanel = () => {
       <div className="mx-auto max-w-7xl">
         
         {/* Header Section */}
-        <div className="mb-8 overflow-hidden shadow-lg rounded-xl bg-gradient-to-r">
-          <div className="px-8 py-8">
-            <h1 className="mb-2 text-3xl font-bold text-black">Payment Management</h1>
-            
+        <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+          <div className="px-2 py-2">
+            <h1 className="mb-2 text-3xl font-bold text-white uppercase">Payment Management</h1>
           </div>
         </div>
 
@@ -195,8 +202,8 @@ const AdminPaymentPanel = () => {
           <StatsCard 
             title="Total Transactions" 
             value={stats.totalTransactions} 
-            icon={<CreditCard size={24} className="text-blue-600" />} 
-            bg="bg-blue-50"
+            icon={<CreditCard size={24} className="text-orange-600" />} 
+            bg="bg-orange-50"
           />
           <StatsCard 
             title="Success Rate" 
@@ -217,13 +224,13 @@ const AdminPaymentPanel = () => {
           <div className="flex flex-col flex-1 gap-3 sm:flex-row sm:items-center">
             {/* Search */}
             <div className="relative group">
-              <Search className="absolute text-gray-400 -translate-y-1/2 left-3 top-1/2 group-focus-within:text-blue-500" size={18} />
+              <Search className="absolute text-gray-400 -translate-y-1/2 left-3 top-1/2 group-focus-within:text-orange-500" size={18} />
               <input
                 type="text"
                 placeholder="Search payments..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-72 pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                className="w-full sm:w-72 pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-sm"
               />
             </div>
 
@@ -233,7 +240,7 @@ const AdminPaymentPanel = () => {
               <select
                 value={selectedFilter}
                 onChange={(e) => setSelectedFilter(e.target.value)}
-                className="pl-10 pr-8 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm appearance-none cursor-pointer"
+                className="pl-10 pr-8 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-sm appearance-none cursor-pointer"
               >
                 <option value="all">All Status</option>
                 <option value="completed">Completed</option>
@@ -246,8 +253,10 @@ const AdminPaymentPanel = () => {
             <select
               value={selectedTimeRange}
               onChange={(e) => setSelectedTimeRange(e.target.value)}
-              className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm cursor-pointer"
+              className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-sm cursor-pointer"
             >
+              {/* ✅ Added All Time Option */}
+              <option value="all">All Time</option>
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
               <option value="90d">Last 90 days</option>
@@ -258,7 +267,7 @@ const AdminPaymentPanel = () => {
           <button
             onClick={handleDownloadPdf}
             disabled={exporting}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {exporting ? <RefreshCw className="animate-spin" size={18} /> : <FileText size={18} />}
             Export PDF
@@ -277,7 +286,7 @@ const AdminPaymentPanel = () => {
                   <th className="px-6 py-4 text-xs font-semibold tracking-wider text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-4 text-xs font-semibold tracking-wider text-gray-500 uppercase">Method</th>
                   <th className="px-6 py-4 text-xs font-semibold tracking-wider text-gray-500 uppercase">Date & Time</th>
-                  <th className="px-6 py-4 text-xs font-semibold tracking-wider text-right text-gray-500 uppercase">Actions</th>
+                  
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -314,17 +323,7 @@ const AdminPaymentPanel = () => {
                           <div className="text-sm text-gray-900">{payment.date}</div>
                           <div className="text-xs text-gray-400 mt-0.5">{payment.time}</div>
                         </td>
-                        <td className="px-6 py-4 text-right align-top">
-                          <div className="flex justify-end gap-2 transition-opacity opacity-0 group-hover:opacity-100">
-                            <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                              <Eye size={18} />
-                            </button>
-                            <button className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors">
-                              <MoreVertical size={18} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                     </tr>
                     );
                   })
                 )}
@@ -350,10 +349,6 @@ const StatsCard = ({ title, value, icon, bg, trend }) => (
         {icon}
       </div>
     </div>
-    {/* Optional: Add trend indicator if needed */}
-    {/* <div className="flex items-center mt-2 text-xs font-medium text-green-600">
-      <TrendingUp size={12} className="mr-1" /> +2.5% vs last week
-    </div> */}
   </div>
 );
 

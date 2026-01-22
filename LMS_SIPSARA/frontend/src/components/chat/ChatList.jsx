@@ -45,7 +45,7 @@ const ChatList = ({ chats, selectedChat, onSelectChat, onlineUsers, onChatDelete
               onClick={() => onSelectChat(chat)}
               className={`p-3 rounded-lg cursor-pointer transition flex items-center justify-between group ${
                 selectedChat?.id === chat.id
-                  ? 'bg-purple-100 border-2 border-purple-600'
+                  ? 'bg-orange-100 border-2 border-orange-600'
                   : 'hover:bg-gray-100 border-2 border-transparent'
               }`}
             >
@@ -59,7 +59,7 @@ const ChatList = ({ chats, selectedChat, onSelectChat, onlineUsers, onChatDelete
                       className="object-cover w-12 h-12 rounded-full"
                     />
                   ) : (
-                    <div className="flex items-center justify-center w-12 h-12 font-bold text-white rounded-full bg-gradient-to-br from-purple-400 to-purple-600">
+                    <div className="flex items-center justify-center w-12 h-12 font-bold text-white rounded-full bg-gradient-to-br from-orange-400 to-orange-600">
                       {displayName?.[0]?.toUpperCase()}
                     </div>
                   )}

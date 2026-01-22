@@ -366,16 +366,15 @@ class TransactionSearchSerializer(serializers.ModelSerializer):
         return obj.user.username if obj.user else "Unknown"
 
 
-# ============================================================
-# FIXED: Cart Serializers with proper course_id validation
-# UPDATED: Handles Teacher model with First_Name/Last_Name
-# ============================================================
-
 class CartSerializer(serializers.ModelSerializer):
     """Serializer for reading cart items (full details)"""
     course_id = serializers.IntegerField(source='course.course_id', read_only=True)
     course_title = serializers.CharField(source='course.title', read_only=True)
-    course_image = serializers.CharField(source='course.image', read_only=True)
+    
+    # ✅ FIX 1: Use MethodField to get the full Image URL safely
+    course_image = serializers.SerializerMethodField(read_only=True)
+    
+    # ✅ FIX 2: Improved teacher name logic
     teacher_name = serializers.SerializerMethodField(read_only=True)
     
     class Meta:
@@ -385,39 +384,52 @@ class CartSerializer(serializers.ModelSerializer):
             'teacher_name', 'price', 'total', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'price', 'total', 'created_at', 'updated_at']
+
+    def get_course_image(self, obj):
+        """Returns the full URL of the course image"""
+        try:
+            if obj.course.image:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.course.image.url)
+                return obj.course.image.url
+            return None
+        except Exception:
+            return None
     
     def get_teacher_name(self, obj):
-        """
-        FIXED: Get teacher's full name
-        Handles different user models (User with username, Teacher with First_Name/Last_Name)
-        """
+        """Returns the teacher's full name or username"""
         try:
-            if not hasattr(obj.course, 'teacher') or obj.course.teacher is None:
-                return None
+            if not obj.course or not obj.course.teacher:
+                return "Unknown Teacher"
             
             teacher = obj.course.teacher
             
-            # Check if it's a Teacher model (has First_Name and Last_Name)
-            if hasattr(teacher, 'first_name') and hasattr(teacher, 'last_name'):
-                return f"{teacher.first_name} {teacher.last_name}"
-            
-            # Check if it's a User model (has username or get_full_name)
+            # 1. Try "full_name" property (common in custom User models)
+            if hasattr(teacher, 'full_name') and teacher.full_name:
+                return teacher.full_name
+                
+            # 2. Try Standard User "get_full_name()"
             if hasattr(teacher, 'get_full_name'):
                 full_name = teacher.get_full_name()
-                return full_name if full_name else getattr(teacher, 'username', 'Unknown')
+                if full_name and full_name.strip():
+                    return full_name
             
-            # Fallback to username if available
-            if hasattr(teacher, 'username'):
+            # 3. Try manual first/last name construction
+            if hasattr(teacher, 'first_name') and hasattr(teacher, 'last_name'):
+                full_name = f"{teacher.first_name} {teacher.last_name}".strip()
+                if full_name:
+                    return full_name
+
+            # 4. Fallback to Username
+            if hasattr(teacher, 'username') and teacher.username:
                 return teacher.username
-            
-            # Last resort
-            return 'Unknown Teacher'
+                
+            return "Unknown Teacher"
             
         except Exception as e:
-            # Log the error but don't crash
             print(f"Error getting teacher name: {e}")
-            return 'Unknown Teacher'
-
+            return "Unknown Teacher"
 
 class CartCreateSerializer(serializers.Serializer):
     """

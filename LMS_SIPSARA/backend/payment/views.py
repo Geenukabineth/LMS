@@ -502,19 +502,22 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
 class TransactionListAPIView(generics.ListAPIView):
     serializer_class = TransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    
+    pagination_class = None 
 
     def get_queryset(self):
+        # Your existing logic
         qs = Transaction.objects.all().order_by('-created_at')
 
         student_id = self.request.query_params.get('student_id')
         if student_id:
             try:
                 sid = int(student_id)
-                qs = qs.filter(student_id=sid)  # student is AUTH_USER_MODEL FK
+                qs = qs.filter(student_id=sid)
             except ValueError:
                 pass
 
-        # If you want normal users to only see their own:
         if not self.request.user.is_staff:
             qs = qs.filter(user=self.request.user)
 
@@ -586,7 +589,7 @@ def fulfill_order(order, transaction):
 
 class AdminPaymentListAPIView(generics.ListAPIView):
     serializer_class = TransactionSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     TIME_RANGE_MAP = {"1d": 1, "7d": 7, "30d": 30, "90d": 90}
 
@@ -1030,3 +1033,136 @@ class TeacherTransactionListAPIView(APIView):
                 {"error": f"Failed to fetch transactions: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+# payment/views.py
+
+class TransactionReceiptView(APIView):
+    """
+    Generate and download a PDF receipt for a specific transaction.
+    Endpoint: GET /payment/transactions/<uuid:pk>/receipt/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk, *args, **kwargs):
+        # 1. Fetch Transaction
+        transaction_obj = get_object_or_404(Transaction, pk=pk)
+
+        # 2. Security Check: Only allow Student, Linked User, or Admin
+        is_owner = (transaction_obj.student == request.user) or (transaction_obj.user == request.user)
+        if not is_owner and not request.user.is_staff:
+            return Response(
+                {"error": "You are not authorized to view this receipt."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 3. Setup PDF Buffer
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=72, leftMargin=72,
+            topMargin=72, bottomMargin=18
+        )
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # --- Header Section ---
+        # Add Company Name / Logo text
+        elements.append(Paragraph("LMS Platform Name", styles['Heading1']))
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph(f"PAYMENT RECEIPT", styles['Title']))
+        elements.append(Spacer(1, 20))
+
+        # --- Transaction Details ---
+        # Format dates
+        date_str = transaction_obj.created_at.strftime("%Y-%m-%d %H:%M")
+        
+        # Get Student Name safeley
+        student_name = "Unknown"
+        if transaction_obj.student:
+            if hasattr(transaction_obj.student, 'full_name'):
+                student_name = transaction_obj.student.full_name
+            elif hasattr(transaction_obj.student, 'get_full_name'):
+                student_name = transaction_obj.student.get_full_name()
+            else:
+                student_name = transaction_obj.student.username
+
+        # Metadata Table
+        meta_data = [
+            ["Transaction ID:", str(transaction_obj.id)],
+            ["Date:", date_str],
+            ["Reference:", transaction_obj.reference_number or "N/A"],
+            ["Student:", student_name],
+            ["Payment Method:", (transaction_obj.payment_method_used or "Stripe").title()],
+            ["Status:", transaction_obj.status.upper()]
+        ]
+
+        t_meta = Table(meta_data, colWidths=[120, 300])
+        t_meta.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.dimgray),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(t_meta)
+        elements.append(Spacer(1, 20))
+
+        # --- Line Items (Courses) ---
+        elements.append(Paragraph("Purchased Items", styles['Heading3']))
+        elements.append(Spacer(1, 10))
+
+        # Table Header
+        data = [['Course Name', 'Price']]
+        
+        # Add Courses rows
+        courses = transaction_obj.courses.all()
+        if courses.exists():
+            for course in courses:
+                data.append([course.title, f"{course.price} {transaction_obj.currency}"])
+        else:
+            # Fallback if no courses linked (e.g. direct fee)
+            data.append([transaction_obj.transaction_type.replace('_', ' ').title(), f"{transaction_obj.amount} {transaction_obj.currency}"])
+
+        # Add Total Row
+        data.append(['', '']) # Empty spacer row
+        data.append(['Total Amount Paid:', f"{transaction_obj.amount} {transaction_obj.currency}"])
+
+        # Create Table
+        t_items = Table(data, colWidths=[300, 100])
+        t_items.setStyle(TableStyle([
+            # Header Style
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+            
+            # Rows Style
+            ('GRID', (0, 0), (-1, -2), 1, colors.lightgrey),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+            ('TOPPADDING', (0, 1), (-1, -1), 8),
+            
+            # Total Row Style
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('ALIGN', (1, -1), (1, -1), 'RIGHT'),
+        ]))
+        
+        elements.append(t_items)
+        elements.append(Spacer(1, 40))
+        
+        # --- Footer ---
+        elements.append(Paragraph("Thank you for your business!", styles['Normal']))
+        elements.append(Paragraph("This is an electronically generated receipt.", styles['Italic']))
+
+        # 4. Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+        
+        # 5. Return Response
+        filename = f"Receipt-{transaction_obj.reference_number or str(transaction_obj.id)[:8]}.pdf"
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response

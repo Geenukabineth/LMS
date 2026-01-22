@@ -72,12 +72,17 @@ function Login() {
       style={{ backgroundImage: "url('/logos/Untitled design.png')" }}>
       <div className="w-full max-w-md p-8 border shadow-xl bg-white/20 backdrop-blur-lg rounded-2xl border-white/30">
         
-        <h2 className="mb-6 text-3xl font-bold text-center">Login</h2>
+        <h2 className="mb-6 text-3xl font-bold text-center uppercase">Login</h2>
 
         {loginSuccess && (
-          <div className="p-3 mb-4 text-green-800 bg-green-100 border border-green-300 rounded">
-            Login successful!
+          <div className="flex items-center p-4 mb-4 text-sm text-green-800 border border-green-200 rounded-lg shadow-sm bg-green-50" role="alert">
+          <svg className="flex-shrink-0 inline w-4 h-4 mr-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z"/>
+          </svg>
+          <div>
+            <span className="font-medium">Success!</span> Login successful.
           </div>
+        </div>
         )}
 
         {loginError && (
@@ -121,7 +126,7 @@ function Login() {
           <p className="mt-2 text-sm text-right">
             <a
               href="/ForgotPassword"
-              className="text-indigo-600 hover:underline"
+              className="text-orange-600 hover:underline"
             >
               Forgot password?
             </a>
@@ -131,7 +136,7 @@ function Login() {
             type="submit"
             disabled={isSubmitting}
             className={`w-full py-2 text-white rounded ${
-              isSubmitting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"
+              isSubmitting ? "bg-gray-400" : "bg-orange-600 hover:bg-orange-700"
             }`}
           >
             {isSubmitting ? "Signing in..." : "Sign In"}
@@ -139,7 +144,7 @@ function Login() {
         </form>
 
         <p className="mt-4 text-sm text-center">
-          Don’t have an account? <a className="text-indigo-600" href="/signup">Signup</a>
+          Don’t have an account? <a className="text-orange-600" href="/signup">Signup</a>
         </p>
 
       </div>

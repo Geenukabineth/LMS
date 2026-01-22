@@ -1,45 +1,5 @@
-"""
-payment/urls.py - FIXED URL Routing
-Critical fix: Specific routes MUST come BEFORE generic routes to prevent route ambiguity
-"""
-
 from django.urls import path
-from .views import (
-    # Main Payment Processing
-    paymentlistview,
-    
-    # Payment Intents (Recommended Stripe Method)
-    CreatePaymentIntentView,
-    ConfirmPaymentView,
-    StripeWebhookView,
-    
-    # Cart Management
-    CartListAPIView,
-    CartCreateAPIView,
-    CartDetailAPIView,
-    CartClearAPIView,
-    
-    # Order Management
-    OrderListAPIView,
-    OrderDetailAPIView,
-    OrderCreateAPIView,
-    
-    # Payment Gateway
-    PaymentGatewayListAPIView,
-    
-    # Transactions
-    TransactionListAPIView,
-    TransactionDetailAPIView,
-    TeacherTransactionListAPIView,
-    
-    # Legacy endpoints (deprecated)
-    CreateCardTokenView,
-    ChargeCustomerView,
-
-    AdminPaymentListAPIView,
-    RecordPaymentView,
-    FinancialStatsAPI,
-)
+from .views import *
 
 app_name = 'payment'
 
@@ -106,6 +66,7 @@ urlpatterns = [
 
     path('teacher/transactions/', TeacherTransactionListAPIView.as_view(), name='teacher-transactions'),
     path('teacher/transactions/<str:teacher_id>/', TeacherTransactionListAPIView.as_view(), name='teacher-transaction-detail'),
+    path('transactions/<uuid:pk>/receipt/', TransactionReceiptView.as_view(), name='transaction-receipt'),
      
     
 ]

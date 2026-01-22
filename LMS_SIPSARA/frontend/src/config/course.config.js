@@ -56,7 +56,7 @@ export const courseService = {
   },
   getCoursesteacher: async () => {
     const { data } = await api.get('Course/courses/teacher/list/');
-    return data?.results ?? [];
+    return data?.results ?? data ?? [];
   },
 
   getCourseteacherdetails: async (courseId) => {
@@ -64,7 +64,7 @@ export const courseService = {
     return data;
   },
 
-  getCourseModules: async (courseId) => {
+  getCourseteacherModules: async (courseId) => {
   const { data } = await api.get(`Course/teacher/modules/${courseId}/`);
   return data;
 },
@@ -185,11 +185,7 @@ getStudentDashboardStats: async () => {
     return data;
   },
 
-  // --- Existing Methods ---
-  getCourseModules: async (courseId) => {
-    const response = await api.get(`Course/teacher/modules/${courseId}/`);
-    return response.data;
-  },
+  
   
   createLesson: async (formData) => {
     const response = await api.post("Course/lessons/create/", formData, {
@@ -419,6 +415,16 @@ updateCourseReview: async (reviewId, payload) => {
     const { data } = await api.post(`Course/live/create/`, payload);
     return data;
   },
+  updateLiveSession: async (sessionId, payload) => {
+    const { data } = await api.put(`Course/live/session/${sessionId}/`, payload);
+    return data;
+  },
+
+  // ✅ ADD THIS: Delete Live Session
+  deleteLiveSession: async (sessionId) => {
+    const { data } = await api.delete(`Course/live/session/${sessionId}/`);
+    return data;
+  },
 
   getLiveSessions: async (courseId) => {
     const { data } = await api.get(`Course/live/list/${courseId}/`);
@@ -446,6 +452,128 @@ getStudentEnrolledCourses: async () => {
 
   updatePlagiarismReportAction: async (reportId, payload) => {
     const { data } = await api.post(`Course/teacher/plagiarism-reports/${reportId}/action/`, payload);
+    return data;
+  },
+  getTeacherGradebook: async (courseId) => {
+    // Matches the URL in your urls.py
+    const { data } = await api.get(`Course/teacher/courses/${courseId}/gradebook/`);
+    return data;
+  },
+  getAdminAllComplaints: async () => {
+    const { data } = await api.get('Course/admin/complaints/all/');
+    return data;
+  },
+
+  getAdminAllFeedback: async () => {
+    const { data } = await api.get('Course/admin/feedback/all/');
+    return data;
+  },
+
+  getEnrolledCourses: async (params = {}) => {
+    try {
+      // Pass params (status, search) directly to the api call
+      const response = await api.get("Course/student/enrolled-courses/", { params });
+      const data = response.data;
+
+      // Handle different pagination/response structures centrally here
+      if (Array.isArray(data)) return data;
+      if (data?.results && Array.isArray(data.results)) return data.results;
+      if (data?.data && Array.isArray(data.data)) return data.data;
+      
+      return [];
+    } catch (error) {
+      console.error("❌ Error fetching enrolled courses:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get details for a specific enrolled course
+   */
+  getEnrolledCourseDetail: async (courseId) => {
+    const response = await api.get(`Course/student/enrolled-courses/${courseId}/`);
+    return response.data;
+  },
+
+  /**
+   * Get progress for a specific course
+   */
+  getCourseProgress: async (courseId) => {
+    const response = await api.get(`Course/student/enrolled-courses/${courseId}/progress/`);
+    return response.data;
+  },
+
+  /**
+   * Get lessons for a specific course
+   */
+  getCourseLessons: async (courseId) => {
+    const response = await api.get(`Course/student/enrolled-courses/${courseId}/lessons/`);
+    return response.data;
+  },
+
+  /**
+   * Get modules for a specific course
+   */
+  getCourseModules: async (courseId) => {
+    const response = await api.get(`Course/student/enrolled-courses/${courseId}/modules/`);
+    return response.data;
+  },
+  searchCourses: async (params = {}) => {
+    // The api wrapper automatically handles query string serialization for 'params'
+    const response = await api.get("Course/courses/search/", { params });
+    return response.data;
+  },
+  
+  // Helper to standardise the response list (handles { results: [] } vs [])
+  extractCourseList: (data) => {
+     if (Array.isArray(data)) return data;
+     if (data?.results) return data.results;
+     if (data?.courses) return data.courses;
+     return [];
+  },
+  getReceptionistStudents: async () => {
+    const { data } = await api.get("lms/register/receptionist/student/list/");
+    return data;
+  },
+
+  getEnrollments: async (params = {}) => {
+    // params can be { student_id: 123 }
+    const { data } = await api.get("Course/enrollments/", { params });
+    return data;
+  },
+
+  getCourses: async () => {
+    const { data } = await api.get("course/list/"); 
+    return data;
+  },
+
+  enrollStudent: async (payload) => {
+    const { data } = await api.post("Course/enroll/", payload);
+    return data;
+  },
+
+  createEnrollment: async (payload) => {
+    const { data } = await api.post("Course/enrollments/create/", payload);
+    return data;
+  },
+
+  // ✅ NEW: Extend Enrollment (PUT)
+  // Maps to: path('enrollments/<int:id>/', ...) which is EnrollmentDetailAPIView
+  updateEnrollment: async (enrollmentId, payload) => {
+    const { data } = await api.put(`Course/enrollments/${enrollmentId}/`, payload);
+    return data;
+  },
+
+  // ✅ NEW: Revoke Enrollment (DELETE)
+  deleteEnrollment: async (enrollmentId) => {
+    const { data } = await api.delete(`Course/enrollments/${enrollmentId}/`);
+    return data;
+  },
+  getCoursesByLevel: async (level) => {
+    
+    const { data } = await api.get('Course/courses/search/', { 
+      params: { level: level } 
+    });
     return data;
   },
  

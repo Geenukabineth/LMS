@@ -107,7 +107,7 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest, onNotification }) => {
             placeholder="Search by name or email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-shadow"
+            className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent transition-shadow"
             autoFocus
           />
         </div>
@@ -116,7 +116,7 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest, onNotification }) => {
         <div className="flex-1 p-2 overflow-y-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-              <div className="w-8 h-8 mb-3 border-4 border-purple-600 rounded-full border-t-transparent animate-spin"></div>
+              <div className="w-8 h-8 mb-3 border-4 border-orange-600 rounded-full border-t-transparent animate-spin"></div>
               <p className="text-sm font-medium">Loading users...</p>
             </div>
           ) : filteredUsers.length === 0 ? (
@@ -153,7 +153,7 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest, onNotification }) => {
                           />
                         ) : null}
                         <div 
-                           className="flex items-center justify-center w-full h-full text-sm font-bold text-white bg-gradient-to-br from-purple-500 to-indigo-600"
+                           className="flex items-center justify-center w-full h-full text-sm font-bold text-white bg-gradient-to-br from-orange-500 to-red-600"
                            style={{ display: fullImageUrl ? 'none' : 'flex' }}
                         >
                           {displayName[0]?.toUpperCase()}
@@ -174,7 +174,7 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest, onNotification }) => {
                     {/* Add Button */}
                     <button
                       onClick={() => handleSendRequest(user.id)}
-                      className="p-2 text-purple-600 transition-all rounded-full opacity-0 bg-purple-50 hover:bg-purple-600 hover:text-white group-hover:opacity-100 focus:opacity-100"
+                      className="p-2 text-orange-600 transition-all rounded-full opacity-0 bg-orange-50 hover:bg-orange-600 hover:text-white group-hover:opacity-100 focus:opacity-100"
                       title="Send Friend Request"
                     >
                       <Plus className="w-5 h-5" />

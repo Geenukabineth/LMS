@@ -88,9 +88,8 @@ const StudentData = () => {
   return (
     <div className="min-h-screen px-4 py-8 bg-gray-50">
       <div className="mx-auto max-w-7xl">
-        <div className="p-8 mb-8 text-white rounded-lg shadow-lg bg-gradient-to-r from-blue-600 to-purple-600">
-          <h1 className="text-4xl font-bold">My Students</h1>
-          <p className="text-blue-100">Manage students enrolled in your courses</p>
+        <div className="flex flex-col gap-4 p-6 mb-6 text-white rounded-lg shadow-md bg-gradient-to-r from-orange-600 to-red-500 md:flex-row md:justify-between md:items-center">
+          <h1 className="text-2xl font-bold uppercase">My Students</h1>
         </div>
 
         <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
@@ -99,7 +98,7 @@ const StudentData = () => {
             <input
               type="text"
               placeholder="Search by student name or email..."
-              className="w-full py-3 pl-10 pr-4 bg-white border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full py-3 pl-10 pr-4 bg-white border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -108,7 +107,7 @@ const StudentData = () => {
           <div className="relative">
             <Filter className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" size={18} />
             <select
-              className="w-full py-3 pl-10 pr-4 bg-white border border-gray-300 rounded-lg outline-none appearance-none focus:ring-2 focus:ring-blue-500"
+              className="w-full py-3 pl-10 pr-4 bg-white border border-gray-300 rounded-lg outline-none appearance-none focus:ring-2 focus:ring-orange-500"
               value={selectedCourse}
               onChange={(e) => setSelectedCourse(e.target.value)}
             >
@@ -145,7 +144,7 @@ const StudentData = () => {
                             key={i} 
                             className={`px-2 py-1 text-[11px] rounded-md border w-fit ${
                                 course.status === 'active' 
-                                ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                                ? 'bg-orange-50 text-orange-700 border-orange-200' 
                                 : 'bg-red-50 text-red-700 border-red-200'
                             }`}
                           >

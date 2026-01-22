@@ -56,7 +56,7 @@ const logoutUser = async () => {
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userId');
     localStorage.removeItem('username');
-    window.location.href = '/login';
+    window.location.href = '/';
   }
 };
 
@@ -400,7 +400,7 @@ const SettingsComponent = () => {
                 )}
                 <label
                   htmlFor="profileImage"
-                  className="absolute bottom-0 right-0 p-2 text-white transition-colors bg-blue-600 rounded-full cursor-pointer hover:bg-blue-700"
+                  className="absolute bottom-0 right-0 p-2 text-white transition-colors bg-orange-600 rounded-full cursor-pointer hover:bg-orange-700"
                 >
                   <Upload className="w-5 h-5" />
                 </label>
@@ -424,7 +424,7 @@ const SettingsComponent = () => {
                 name="full_name"
                 value={formData.full_name}
                 onChange={handleChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
               />
             </div>
             <div>
@@ -437,7 +437,7 @@ const SettingsComponent = () => {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
               />
             </div>
             <div>
@@ -450,7 +450,7 @@ const SettingsComponent = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
               />
             </div>
             <div>
@@ -463,7 +463,7 @@ const SettingsComponent = () => {
                 name="phoneNumber"
                 value={formData.phoneNumber}
                 onChange={handleChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
               />
             </div>
           </div>
@@ -491,7 +491,7 @@ const SettingsComponent = () => {
                   name="currentPassword"
                   value={formData.currentPassword}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                 />
                 <button
                   type="button"
@@ -513,7 +513,7 @@ const SettingsComponent = () => {
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                 />
                 <button
                   type="button"
@@ -535,7 +535,7 @@ const SettingsComponent = () => {
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                 />
                 <button
                   type="button"
@@ -549,8 +549,8 @@ const SettingsComponent = () => {
             <button
               onClick={handlePasswordChange}
               disabled={isSaving}
-              className={`bg-blue-600 text-white px-6 py-3 rounded-xl flex items-center space-x-2 font-semibold transition-colors duration-200 ease-in-out ${
-                isSaving ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700 shadow-md'
+              className={`bg-orange-600 text-white px-6 py-3 rounded-xl flex items-center space-x-2 font-semibold transition-colors duration-200 ease-in-out ${
+                isSaving ? 'opacity-60 cursor-not-allowed' : 'hover:bg-orange-700 shadow-md'
               }`}
             >
               {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
@@ -566,7 +566,7 @@ const SettingsComponent = () => {
 
   return (
     <div className="min-h-screen p-8 bg-gray-100">
-      <h1 className="mb-8 text-3xl font-bold text-gray-900">Settings</h1>
+      
 
       {activeTab !== 'security' && (
         <>
@@ -594,7 +594,7 @@ const SettingsComponent = () => {
                     }}
                     className={`w-full text-left flex items-center px-4 py-3 rounded-xl transition-colors duration-200 ease-in-out ${
                       activeTab === tab.id
-                        ? 'bg-blue-600 text-white shadow-md'
+                        ? 'bg-orange-600 text-white shadow-md'
                         : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                     }`}
                   >
@@ -615,8 +615,8 @@ const SettingsComponent = () => {
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className={`bg-blue-600 text-white px-6 py-3 rounded-xl flex items-center space-x-2 font-semibold transition-colors duration-200 ease-in-out ${
-                    isSaving ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700 shadow-md'
+                  className={`bg-orange-600 text-white px-6 py-3 rounded-xl flex items-center space-x-2 font-semibold transition-colors duration-200 ease-in-out ${
+                    isSaving ? 'opacity-60 cursor-not-allowed' : 'hover:bg-orange-700 shadow-md'
                   }`}
                 >
                   {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
