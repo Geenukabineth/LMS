@@ -549,7 +549,21 @@ class PasswordChangeSerializer(serializers.Serializer):
         return user
     
 
+# serializers.py
+
+# ... (keep your existing imports and other serializers) ...
+
 class CurrentUserSerializer(serializers.ModelSerializer):
+    
+    status = serializers.SerializerMethodField()  
+    email = serializers.CharField(source='user.email', read_only=True) 
+
     class Meta:
-        model = Student # Correctly linked to the Student model
-        fields = "__all__" # Correctly exposes all Student fields like firstName
+        model = Student
+        fields = "__all__" 
+
+    def get_status(self, obj):
+        
+        if hasattr(obj, 'user') and obj.user:
+            return "Active" if obj.user.is_active else "Inactive"
+        return "Inactive"

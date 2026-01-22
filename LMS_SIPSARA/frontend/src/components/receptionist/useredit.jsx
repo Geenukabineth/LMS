@@ -125,8 +125,7 @@ const UserEdit = ({ student, onUpdate, onClose }) => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Pending">Pending</option>
+                <option value="Inactive">Inactive</option>                
               </select>
             </div>
 

@@ -136,29 +136,23 @@ class UserListView(APIView):
 
 
 class studentviewlist(APIView):
-    """
-    Get list of all students or Update a specific student
-    """
+ 
     permission_classes = (permissions.AllowAny,)
     
     def get(self, request, id=None):
         if id:
             try:
-                # Try to get by User ID first, then Student ID
-                try:
-                    student_user = User.objects.get(id=id, user_type=User.STUDENT)
-                except User.DoesNotExist:
-                    student_obj = Student.objects.get(id=id)
-                    student_user = student_obj.user
-
-                serializer = UserSerializer(student_user)
+           
+                student = Student.objects.get(id=id)
+                serializer = CurrentUserSerializer(student)
                 return Response(serializer.data)
-            except (User.DoesNotExist, Student.DoesNotExist):
+            except Student.DoesNotExist:
                 return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
         
         try:
-            students = User.objects.filter(user_type=User.STUDENT)
-            serializer = UserSerializer(students, many=True)
+            
+            students = Student.objects.all()
+            serializer = CurrentUserSerializer(students, many=True)
             count = students.count()
             
             return Response({
@@ -175,36 +169,54 @@ class studentviewlist(APIView):
                 "students": []
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # ✅ ADDED THIS METHOD TO FIX THE ERROR
     def put(self, request, id):
         try:
-            # The ID passed from the frontend is likely the Student ID (from ReceptionRegisterView list)
-            # We need to find the Student object and their linked User account
+            
             student = Student.objects.get(id=id)
+            
             user = student.user
         except Student.DoesNotExist:
             return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # 1. Update User model fields (Email, Phone, Status)
-        if 'email' in request.data:
-            user.email = request.data['email']
-        if 'phone' in request.data:
-            user.phone = request.data['phone']
-        
-        # Handle status update (Active/Inactive)
-        if 'status' in request.data:
-            status_val = request.data['status']
-            user.is_active = (status_val == 'Active')
-            
-        user.save()
+        data = request.data
 
-        # 2. Update Student model fields (Name)
-        if 'firstName' in request.data:
-            student.firstName = request.data['firstName']
-        if 'lastName' in request.data:
-            student.lastName = request.data['lastName']
         
-        student.save()
+        student_updated = False
+        if 'firstName' in data:
+            student.firstName = data['firstName']
+            student_updated = True
+        if 'lastName' in data:
+            student.lastName = data['lastName']
+            student_updated = True
+        if 'email' in data:
+            student.email = data['email']
+            student_updated = True
+        if 'phone' in data:
+            student.phone = data['phone']
+            student_updated = True
+        
+        if student_updated:
+            student.save()  
+        if 'status' in data:
+            new_status = data['status']
+            user.is_active = (new_status == 'Active')
+
+        # --- UPDATE USER TABLE (Login/Auth Info) ---
+        user_updated = False
+        if 'email' in data:
+            user.email = data['email']
+            user.username = data['email'].split('@')[0]  # Keep username in sync with email
+            user_updated = True
+        if 'phone' in data:
+            user.phone = data['phone']
+            user_updated = True
+        if 'status' in data:
+            # Map frontend status string to boolean is_active
+            user.is_active = (data['status'] == 'Active')
+            user_updated = True
+
+        if user_updated:
+            user.save()  # ✅ Explicit save for User model
 
         return Response({
             "success": True, 
@@ -213,7 +225,7 @@ class studentviewlist(APIView):
                 "id": student.id,
                 "firstName": student.firstName,
                 "lastName": student.lastName,
-                "email": user.email,
+                "email": user.email, # Return the source of truth from User table
                 "phone": user.phone,
                 "status": "Active" if user.is_active else "Inactive"
             }
