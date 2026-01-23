@@ -1,5 +1,4 @@
-// AddWeeklyContent.jsx
-// New interface + quiz/assignment lock for editing
+
 
 import React, { useEffect, useMemo, useState } from "react";
 import {

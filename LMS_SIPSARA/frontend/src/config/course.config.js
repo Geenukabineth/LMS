@@ -515,9 +515,10 @@ getStudentEnrolledCourses: async () => {
    * Get modules for a specific course
    */
   getCourseModules: async (courseId) => {
-    const response = await api.get(`Course/student/enrolled-courses/${courseId}/modules/`);
-    return response.data;
+    // This calls the endpoint that returns { course: ..., modules: [...] }
+    return await courseService.getCourseteacherModules(courseId);
   },
+  
   searchCourses: async (params = {}) => {
     // The api wrapper automatically handles query string serialization for 'params'
     const response = await api.get("Course/courses/search/", { params });
